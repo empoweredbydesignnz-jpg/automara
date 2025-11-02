@@ -1,0 +1,345 @@
+// frontend/public/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#3b82f6" />
+    <meta name="description" content="Automara - Multi-tenant SaaS platform for MSP workflow automation" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Automara - MSP Workflow Automation</title>
+</head>
+<body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+</body>
+</html>
+
+
+// README.md
+# Automara - Multi-Tenant SaaS Platform
+
+Automara is a comprehensive multi-tenant SaaS platform designed for Managed Service Providers (MSPs) to automate Microsoft 365 workflows including user onboarding, offboarding, and conditional access deployment.
+
+## 🏗️ Architecture
+
+### Technology Stack
+
+**Backend:**
+- Node.js + Express.js
+- PostgreSQL with per-tenant schemas
+- SuperTokens (Authentication & MFA)
+- N8N (Workflow Automation)
+- Stripe (Payment Processing)
+- JWT + AES-256-GCM encryption
+
+**Frontend:**
+- React 18
+- React Router v6
+- Tailwind CSS
+- Axios
+- Lucide Icons
+
+**Infrastructure:**
+- Docker + Docker Compose
+- Nginx (Reverse Proxy + SSL)
+- Let's Encrypt (SSL Certificates)
+- Portainer (Container Management)
+
+## 🔒 Security Features
+
+1. **Multi-Factor Authentication** via SuperTokens
+2. **AES-256-GCM Encryption** for sensitive data
+3. **Per-tenant schema isolation** in PostgreSQL
+4. **HMAC webhook verification**
+5. **JWT-based authentication** with secure token storage
+6. **Rate limiting** on all API endpoints
+7. **CORS protection** with whitelist
+8. **Helmet.js security headers**
+
+## 📦 Installation
+
+### Prerequisites
+
+- Debian Linux VM on ESXi
+- Docker & Docker Compose
+- Static IP address
+- DNS configured for:
+  - automara.empoweredbydesign.co.nz
+  - api.empoweredbydesign.co.nz
+  - webhook.empoweredbydesign.co.nz
+
+### Quick Start
+
+1. **Clone and setup:**
+```bash
+cd /opt
+sudo mkdir automara
+cd automara
+# Copy all files to this directory
+sudo chmod +x setup.sh
+```
+
+2. **Configure environment:**
+```bash
+# Edit .env file with your credentials
+sudo nano .env
+```
+
+3. **Run setup script:**
+```bash
+sudo ./setup.sh
+```
+
+4. **Initialize SSL certificates:**
+```bash
+cd /opt/automara
+sudo ./scripts/init-letsencrypt.sh
+```
+
+5. **Start all services:**
+```bash
+docker-compose up -d
+```
+
+## 🔧 Configuration
+
+### Required Environment Variables
+
+**Database:**
+- `POSTGRES_USER` - PostgreSQL username
+- `POSTGRES_PASSWORD` - PostgreSQL password
+- `POSTGRES_DB` - Database name
+
+**Authentication:**
+- `JWT_SECRET` - JWT signing secret
+- `SUPERTOKENS_API_KEY` - SuperTokens API key
+- `DB_ENCRYPTION_KEY` - AES encryption key
+
+**N8N:**
+- `N8N_ENCRYPTION_KEY` - N8N encryption key
+
+**Stripe:**
+- `STRIPE_SECRET_KEY` - Stripe secret key
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook secret
+
+**Webhooks:**
+- `WEBHOOK_SIGNING_SECRET` - HMAC signing secret
+
+### DNS Configuration
+
+Point these A records to your static IP:
+- automara.empoweredbydesign.co.nz → YOUR_STATIC_IP
+- api.empoweredbydesign.co.nz → YOUR_STATIC_IP
+- webhook.empoweredbydesign.co.nz → YOUR_STATIC_IP
+
+### Port Forwarding
+
+Forward these ports from your router to the server:
+- Port 80 (HTTP)
+- Port 443 (HTTPS)
+
+## 🚀 Usage
+
+### 1. Register a Tenant
+
+```bash
+POST https://api.empoweredbydesign.co.nz/api/tenants/register
+{
+  "name": "Acme Corp",
+  "subdomain": "acme",
+  "email": "admin@acme.com",
+  "plan": "basic"
+}
+```
+
+### 2. Create a Workflow
+
+Navigate to https://automara.empoweredbydesign.co.nz and:
+1. Login with your credentials
+2. Go to Workflows
+3. Click "Create Workflow"
+4. Select a template (M365 Onboarding, etc.)
+5. Enter your M365 credentials
+6. Activate the workflow
+
+### 3. Trigger a Workflow
+
+Use the webhook URL provided:
+
+```bash
+POST https://webhook.empoweredbydesign.co.nz/{tenant_id}/{workflow_id}
+Headers:
+  X-Webhook-Signature: {hmac_signature}
+  X-Webhook-Timestamp: {unix_timestamp}
+Body:
+  {
+    "displayName": "John Doe",
+    "userPrincipalName": "john.doe@acme.com",
+    "givenName": "John",
+    "surname": "Doe"
+  }
+```
+
+## 📊 API Documentation
+
+Full API documentation available at:
+https://api.empoweredbydesign.co.nz/api-docs
+
+### Key Endpoints
+
+**Tenants:**
+- `POST /api/tenants/register` - Register new tenant
+- `GET /api/tenants/me` - Get current tenant info
+- `GET /api/tenants/usage` - Get usage statistics
+
+**Workflows:**
+- `GET /api/workflows/templates` - List templates
+- `POST /api/workflows` - Create workflow
+- `POST /api/workflows/:id/activate` - Activate workflow
+- `POST /api/workflows/:id/execute` - Execute workflow
+
+**API Keys:**
+- `GET /api/keys` - List API keys
+- `POST /api/keys` - Create API key
+- `DELETE /api/keys/:id` - Revoke API key
+
+## 🛠️ Management
+
+### Access Portainer
+https://YOUR_STATIC_IP:9000
+
+### View Logs
+```bash
+# All containers
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f backend
+docker-compose logs -f n8n
+```
+
+### Database Access
+```bash
+docker-compose exec postgres psql -U automara -d automara
+```
+
+### Backup Database
+```bash
+docker-compose exec postgres pg_dump -U automara automara > backup.sql
+```
+
+## 🔄 Workflow Templates
+
+### M365 User Onboarding
+Automates:
+- User account creation
+- License assignment
+- Group membership
+- Email setup
+
+### M365 User Offboarding
+Automates:
+- Account deactivation
+- License removal
+- Access revocation
+- Data backup
+
+### Conditional Access Deployment
+Automates:
+- Policy creation
+- Policy assignment
+- Compliance monitoring
+
+## 💳 Billing & Subscriptions
+
+Automara uses Stripe for payment processing:
+1. Tenants subscribe to a plan
+2. Webhooks update subscription status
+3. Access is controlled based on subscription
+
+### Stripe Setup
+
+1. Create products in Stripe Dashboard
+2. Get price IDs
+3. Update frontend with price IDs
+4. Configure webhook endpoint
+
+## 🐛 Troubleshooting
+
+### Service Won't Start
+```bash
+# Check logs
+docker-compose logs [service_name]
+
+# Restart service
+docker-compose restart [service_name]
+```
+
+### Database Connection Issues
+```bash
+# Check database is running
+docker-compose ps postgres
+
+# Test connection
+docker-compose exec postgres psql -U automara -c "SELECT 1"
+```
+
+### SSL Certificate Issues
+```bash
+# Renew certificates manually
+docker-compose run --rm certbot renew
+docker-compose exec nginx nginx -s reload
+```
+
+## 📈 Monitoring
+
+### Health Checks
+- API: https://api.empoweredbydesign.co.nz/health
+- Frontend: https://automara.empoweredbydesign.co.nz
+- N8N: http://YOUR_IP:5678/healthz
+
+### Metrics
+- View execution history in dashboard
+- Monitor workflow success rates
+- Track API usage per tenant
+
+## 🔐 Security Best Practices
+
+1. **Change all default passwords**
+2. **Rotate encryption keys regularly**
+3. **Enable firewall on the server**
+4. **Keep Docker images updated**
+5. **Monitor audit logs**
+6. **Implement backup strategy**
+7. **Use strong MFA methods**
+
+## 📝 License
+
+Proprietary - Empowered by Design
+Copyright © 2024 Empowered by Design
+
+## 🤝 Support
+
+For support, email: support@empoweredbydesign.co.nz
+Website: https://empoweredbydesign.co.nz
+
+## 🚧 Roadmap
+
+- [ ] Additional workflow templates
+- [ ] Advanced reporting & analytics
+- [ ] Multi-cloud support (AWS, Azure, GCP)
+- [ ] Workflow marketplace
+- [ ] API rate limiting per tenant
+- [ ] Advanced audit logging
+- [ ] Custom branding per tenant
+- [ ] Mobile app
+
+---
+
+**Built with ❤️ by Empowered by Design**
