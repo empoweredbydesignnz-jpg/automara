@@ -30,35 +30,61 @@ function App() {
 
   const handleLogin = async (email, password, tenantDomain) => {
     try {
+      const response = await axios.post('/api/auth/login', {
+        email,
+        password,
+        tenantDomain
+      });
+
+      if (!response.data.success) {
+        return {
+          success: false,
+          message: response.data.error
+        };
+      }
+
       const userData = {
-        id: '1',
-        email: email,
-        name: email.split('@')[0],
-        role: 'admin'
-      }
+        id: response.data.user.id,
+        email: response.data.user.email,
+        name: response.data.user.first_name || response.data.user.email.split('@')[0],
+        role: response.data.user.role,
+        tenantId: response.data.user.tenant_id
+      };
 
-      const tenantData = {
-        id: '1',
-        name: tenantDomain,
-        domain: tenantDomain
-      }
+      const tenantData = response.data.isAdmin ? null : {
+        id: response.data.tenant.id,
+        name: response.data.tenant.name,
+        domain: response.data.tenant.domain,
+        status: response.data.tenant.status
+      };
 
-      setUser(userData)
-      setCurrentTenant(tenantData)
-      setIsAuthenticated(true)
+      setUser(userData);
+      setCurrentTenant(tenantData);
+      setIsAuthenticated(true);
       
-      localStorage.setItem('user', JSON.stringify(userData))
-      localStorage.setItem('currentTenant', JSON.stringify(tenantData))
+      localStorage.setItem('user', JSON.stringify(userData));
+      if (tenantData) {
+        localStorage.setItem('currentTenant', JSON.stringify(tenantData));
+      }
       
-      return { success: true }
+      return { success: true };
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('Login error:', error);
+      
+      if (error.response?.data?.suspended) {
+        return {
+          success: false,
+          suspended: true,
+          message: 'This account has been suspended. Please contact support.'
+        };
+      }
+      
       return { 
         success: false, 
-        message: 'Login failed. Please try again.' 
-      }
+        message: error.response?.data?.error || 'Login failed. Please try again.' 
+      };
     }
-  }
+  };
 
   const handleLogout = () => {
     setUser(null)

@@ -5,6 +5,9 @@ function TenantsPage() {
   const [tenants, setTenants] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showManageModal, setShowManageModal] = useState(false)
+  const [selectedTenant, setSelectedTenant] = useState(null)
+  const [saving, setSaving] = useState(false)
   const [newTenant, setNewTenant] = useState({
     name: '',
     domain: '',
@@ -17,15 +20,17 @@ function TenantsPage() {
 
   const fetchTenants = async () => {
     try {
-      const response = await axios.get('/api/tenants')
+      const user = JSON.parse(localStorage.getItem('user'));
+      const response = await axios.get('/api/tenants', {
+        headers: {
+          'x-user-role': user?.role || 'client',
+          'x-tenant-id': user?.tenantId || ''
+        }
+      });
       setTenants(response.data.tenants || [])
     } catch (error) {
       console.error('Error fetching tenants:', error)
-      setTenants([
-        { id: 1, name: 'Acme Corp', domain: 'acme.automara.com', owner_email: 'admin@acme.com', status: 'active', created_at: '2025-01-15' },
-        { id: 2, name: 'TechStart Inc', domain: 'techstart.automara.com', owner_email: 'owner@techstart.com', status: 'active', created_at: '2025-02-20' },
-        { id: 3, name: 'Global Solutions', domain: 'global.automara.com', owner_email: 'contact@global.com', status: 'active', created_at: '2025-03-10' },
-      ])
+      setTenants([])
     } finally {
       setLoading(false)
     }
@@ -40,6 +45,81 @@ function TenantsPage() {
       fetchTenants()
     } catch (error) {
       console.error('Error adding tenant:', error)
+    }
+  }
+
+  const handleManage = (tenant) => {
+    setSelectedTenant({...tenant})
+    setShowManageModal(true)
+  }
+const handleUpdateTenant = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await axios.put(`/api/tenants/${selectedTenant.id}`, selectedTenant, {
+        headers: {
+          'x-user-role': user?.role || 'client',
+          'x-tenant-id': user?.tenantId || ''
+        }
+      })
+      setShowManageModal(false)
+      setSelectedTenant(null)
+      fetchTenants()
+      alert('Tenant updated successfully!')
+    } catch (error) {
+      console.error('Error updating tenant:', error)
+      alert('Failed to update tenant')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+const handleDeleteTenant = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedTenant.name}? This action cannot be undone.`)) {
+      return
+    }
+    
+    setSaving(true)
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await axios.delete(`/api/tenants/${selectedTenant.id}`, {
+        headers: {
+          'x-user-role': user?.role || 'client',
+          'x-tenant-id': user?.tenantId || ''
+        }
+      })
+      setShowManageModal(false)
+      setSelectedTenant(null)
+      fetchTenants()
+      alert('Tenant deleted successfully!')
+    } catch (error) {
+      console.error('Error deleting tenant:', error)
+      alert('Failed to delete tenant')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleStatusChange = async (status) => {
+    setSaving(true)
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await axios.patch(`/api/tenants/${selectedTenant.id}/status`, { status }, {
+        headers: {
+          'x-user-role': user?.role || 'client',
+          'x-tenant-id': user?.tenantId || ''
+        }
+      })
+      setSelectedTenant({...selectedTenant, status})
+      fetchTenants()
+      alert(`Tenant ${status === 'active' ? 'activated' : 'suspended'} successfully!`)
+    } catch (error) {
+      console.error('Error changing status:', error)
+      alert('Failed to change status')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -63,6 +143,18 @@ function TenantsPage() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
         </div>
+      ) : tenants.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🏢</div>
+          <h3 className="text-xl font-semibold text-white mb-2">No tenants yet</h3>
+          <p className="text-gray-400 mb-6">Get started by adding your first tenant</p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded-lg transition"
+          >
+            Add First Tenant
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {tenants.map((tenant) => (
@@ -74,7 +166,11 @@ function TenantsPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
                   {tenant.name.charAt(0)}
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500 bg-opacity-10 text-green-400 border border-green-500">
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  tenant.status === 'active' 
+                    ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500' 
+                    : 'bg-red-500 bg-opacity-10 text-red-400 border border-red-500'
+                }`}>
                   {tenant.status}
                 </span>
               </div>
@@ -94,10 +190,13 @@ function TenantsPage() {
               </div>
 
               <div className="flex space-x-2">
-                <button className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm font-medium">
+                <button 
+                  onClick={() => handleManage(tenant)}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium"
+                >
                   Manage
                 </button>
-                <button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium">
+                <button className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm font-medium">
                   Details
                 </button>
               </div>
@@ -106,6 +205,7 @@ function TenantsPage() {
         </div>
       )}
 
+      {/* Add Tenant Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-xl p-8 max-w-md w-full border border-gray-700">
@@ -113,9 +213,7 @@ function TenantsPage() {
             
             <form onSubmit={handleAddTenant} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Tenant Name
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Tenant Name</label>
                 <input
                   type="text"
                   value={newTenant.name}
@@ -127,9 +225,7 @@ function TenantsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Domain
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Domain</label>
                 <input
                   type="text"
                   value={newTenant.domain}
@@ -141,9 +237,7 @@ function TenantsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Owner Email
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Owner Email</label>
                 <input
                   type="email"
                   value={newTenant.owner_email}
@@ -168,6 +262,125 @@ function TenantsPage() {
                 >
                   Add Tenant
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Tenant Modal */}
+      {showManageModal && selectedTenant && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl p-8 max-w-2xl w-full border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Manage Tenant</h2>
+              <button
+                onClick={() => setShowManageModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateTenant} className="space-y-6">
+              {/* Tenant Info */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white">Tenant Information</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Tenant Name</label>
+                  <input
+                    type="text"
+                    value={selectedTenant.name}
+                    onChange={(e) => setSelectedTenant({...selectedTenant, name: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Domain</label>
+                  <input
+                    type="text"
+                    value={selectedTenant.domain}
+                    onChange={(e) => setSelectedTenant({...selectedTenant, domain: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Owner Email</label>
+                  <input
+                    type="email"
+                    value={selectedTenant.owner_email}
+                    onChange={(e) => setSelectedTenant({...selectedTenant, owner_email: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Status Management */}
+              <div className="border-t border-gray-700 pt-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Status Management</h3>
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange('active')}
+                    disabled={selectedTenant.status === 'active' || saving}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ✓ Activate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange('suspended')}
+                    disabled={selectedTenant.status === 'suspended' || saving}
+                    className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ⏸ Suspend
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-between pt-6 border-t border-gray-700">
+                <button
+                  type="button"
+                  onClick={handleDeleteTenant}
+                  disabled={saving}
+                  className="bg-red-600 hover:bg-red-700 text-white py-2 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Delete Tenant
+                </button>
+                
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowManageModal(false)}
+                    disabled={saving}
+                    className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-2 px-6 rounded-lg transition disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    {saving ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <span>Save Changes</span>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

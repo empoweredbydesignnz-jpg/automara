@@ -80,46 +80,24 @@ services:
 
   # Backend API
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: automara-backend
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      supertokens:
-        condition: service_healthy
-      n8n:
-        condition: service_healthy
     environment:
       NODE_ENV: production
-      PORT: ${API_PORT}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRY: ${JWT_EXPIRY}
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: automara
+      DB_USER: automara
+      DB_PASSWORD: automara
       DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
-      SUPERTOKENS_CONNECTION_URI: ${SUPERTOKENS_CONNECTION_URI}
-      SUPERTOKENS_API_KEY: ${SUPERTOKENS_API_KEY}
-      N8N_HOST: http://n8n:5678
-      N8N_API_KEY: ${N8N_ENCRYPTION_KEY}
-      WEBHOOK_URL: ${WEBHOOK_URL}
-      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      FRONTEND_URL: https://${FRONTEND_DOMAIN}
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
     ports:
-      - "${API_PORT}:4000"
+      - "4000:4000"
+    depends_on:
+      - postgres
     networks:
       - automara-network
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Frontend React Application
   frontend:

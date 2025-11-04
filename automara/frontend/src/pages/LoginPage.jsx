@@ -42,18 +42,22 @@ function LoginPage({ onLogin }) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
+           <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Tenant Domain
+                Tenant Domain {email !== 'admin@automara.com' && '*'}
               </label>
               <input
                 type="text"
                 value={tenantDomain}
                 onChange={(e) => setTenantDomain(e.target.value)}
                 placeholder="company.automara.com"
-                required
-                className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                required={email !== 'admin@automara.com'}
+                disabled={email === 'admin@automara.com'}
+                className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition disabled:opacity-50"
               />
+              {email === 'admin@automara.com' && (
+                <p className="text-xs text-gray-500 mt-2">Admin account - no tenant required</p>
+              )}
             </div>
 
             <div>
