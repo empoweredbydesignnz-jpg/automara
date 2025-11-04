@@ -260,6 +260,80 @@ app.delete('/api/tenants/:id', async (req, res) => {
   }
 });
 
+// Get all roles
+app.get('/api/roles', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM roles ORDER BY id');
+    res.json({ roles: result.rows });
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all users (admin only)
+app.get('/api/users', async (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  
+  if (userRole !== 'global_admin' && userRole !== 'client_admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  try {
+    let query;
+    let params = [];
+    
+    if (userRole === 'global_admin') {
+      // Global admin sees all users
+      query = 'SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name FROM users u LEFT JOIN client_tenants t ON u.tenant_id = t.id ORDER BY u.created_at DESC';
+    } else if (userRole === 'client_admin') {
+      // Client admin sees only users in their tenant
+      const tenantId = req.headers['x-tenant-id'];
+      query = 'SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name FROM users u LEFT JOIN client_tenants t ON u.tenant_id = t.id WHERE u.tenant_id = $1 ORDER BY u.created_at DESC';
+      params = [tenantId];
+    }
+    
+    const result = await pool.query(query, params);
+    res.json({ users: result.rows });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user role (admin only)
+app.patch('/api/users/:id/role', async (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  const { id } = req.params;
+  const { role } = req.body;
+  
+  // Only global_admin and client_admin can change roles
+  if (userRole !== 'global_admin' && userRole !== 'client_admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  // Client admins can't assign global_admin role
+  if (userRole === 'client_admin' && role === 'global_admin') {
+    return res.status(403).json({ error: 'Cannot assign global admin role' });
+  }
+  
+  try {
+    const result = await pool.query(
+      'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [role, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

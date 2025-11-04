@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import TenantsPage from './pages/TenantsPage'
 import SettingsPage from './pages/SettingsPage'
 import Layout from './components/Layout'
+import UsersPage from './pages/UsersPage'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -141,6 +142,7 @@ function App() {
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard tenant={currentTenant} />} />
                   <Route path="/tenants" element={<TenantsPage />} />
+		  <Route path="/users" element={<UsersPage />} />
                   <Route path="/settings" element={<SettingsPage user={user} />} />
                   <Route path="/" element={<Navigate to="/dashboard" />} />
                 </Routes>

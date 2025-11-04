@@ -3,12 +3,16 @@ import { Link, useLocation } from 'react-router-dom'
 import axios from 'axios'
 
 function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
+  console.log('Layout received user:', user);
+  console.log('User role:', user?.role);
+  
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const location = useLocation()
 
   const navigation = [
     { name: 'Dashboard', path: '/dashboard', icon: '📊' },
-    ...(user?.role === 'admin' ? [{ name: 'Tenants', path: '/tenants', icon: '🏢' }] : []),
+    ...(user?.role === 'global_admin' || user?.role === 'admin' ? [{ name: 'Tenants', path: '/tenants', icon: '🏢' }] : []),
+    ...(user?.role === 'global_admin' || user?.role === 'client_admin' ? [{ name: 'Users', path: '/users', icon: '👥' }] : []),
     { name: 'Settings', path: '/settings', icon: '⚙️' },
   ]
 
