@@ -172,6 +172,31 @@ function TenantsPage() {
     }
   }
 
+  const handleConvertToMSP = async () => {
+    if (!confirm(`Are you sure you want to convert ${selectedTenant.name} to an MSP? This will allow them to manage sub-tenants.`)) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await axios.post(`/api/tenants/${selectedTenant.id}/convert-to-msp`, {}, {
+        headers: {
+          'x-user-role': user?.role || 'client',
+          'x-tenant-id': user?.tenantId || ''
+        }
+      })
+      setSelectedTenant({...selectedTenant, tenant_type: 'msp'})
+      fetchTenants()
+      alert('Tenant converted to MSP successfully!')
+    } catch (error) {
+      console.error('Error converting to MSP:', error)
+      alert(error.response?.data?.error || 'Failed to convert to MSP')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -205,71 +230,147 @@ function TenantsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tenants.map((tenant) => (
-            <div
-              key={tenant.id}
-              className={`bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition group ${
-                tenant.parent_tenant_id ? 'ml-8 border-l-4 border-l-blue-500' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
-                    {tenant.name.charAt(0)}
-                  </div>
-                  {tenant.parent_tenant_id && (
-                    <span className="text-xs text-blue-400">↳ Sub-tenant</span>
+        <div className="space-y-6">
+          {/* Group tenants by MSP */}
+          {(() => {
+            const user = JSON.parse(localStorage.getItem('user'))
+            const isGlobalAdmin = user?.role === 'global_admin' || user?.role === 'admin'
+
+            // Group by MSP root
+            const mspGroups = {}
+            tenants.forEach(tenant => {
+              const rootId = tenant.msp_root_id || tenant.id
+              if (!mspGroups[rootId]) {
+                mspGroups[rootId] = []
+              }
+              mspGroups[rootId].push(tenant)
+            })
+
+            return Object.values(mspGroups).map((group, groupIndex) => {
+              const mspTenant = group.find(t => t.id === (t.msp_root_id || t.id))
+              const subTenants = group.filter(t => t.id !== mspTenant?.id)
+
+              return (
+                <div key={groupIndex} className="space-y-4">
+                  {/* MSP Header */}
+                  {mspTenant && (
+                    <div className="bg-gray-800 rounded-xl p-6 border-2 border-purple-500">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+                            {mspTenant.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h3 className="text-xl font-bold text-white">{mspTenant.name}</h3>
+                              {mspTenant.tenant_type === 'msp' && (
+                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500 bg-opacity-20 text-purple-400 border border-purple-500">
+                                  MSP
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-purple-400 text-sm">{mspTenant.domain}</p>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          mspTenant.status === 'active'
+                            ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500'
+                            : 'bg-red-500 bg-opacity-10 text-red-400 border border-red-500'
+                        }`}>
+                          {mspTenant.status}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+                        <div className="bg-gray-900 rounded-lg p-3">
+                          <div className="text-gray-400">Clients</div>
+                          <div className="text-2xl font-bold text-white">{mspTenant.sub_tenant_count || 0}</div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-3">
+                          <div className="text-gray-400">Users</div>
+                          <div className="text-2xl font-bold text-white">{mspTenant.user_count || 0}</div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-3">
+                          <div className="text-gray-400">Owner</div>
+                          <div className="text-sm text-white truncate">{mspTenant.owner_email}</div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-3">
+                          <div className="text-gray-400">Created</div>
+                          <div className="text-sm text-white">{new Date(mspTenant.created_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleManage(mspTenant)}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium"
+                        >
+                          Manage
+                        </button>
+                        {mspTenant.tenant_type === 'msp' && (
+                          <button
+                            onClick={() => handleAddSubTenant(mspTenant)}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium"
+                          >
+                            + Add Client
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sub-tenants grid */}
+                  {subTenants.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-8">
+                      {subTenants.map((tenant) => (
+                        <div
+                          key={tenant.id}
+                          className="bg-gray-800 rounded-xl p-5 border-l-4 border-l-blue-500 border border-gray-700 hover:border-blue-500 transition group"
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                                {tenant.name.charAt(0)}
+                              </div>
+                              <span className="text-xs text-blue-400">Client</span>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              tenant.status === 'active'
+                                ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500'
+                                : 'bg-red-500 bg-opacity-10 text-red-400 border border-red-500'
+                            }`}>
+                              {tenant.status}
+                            </span>
+                          </div>
+
+                          <h3 className="text-lg font-bold text-white mb-1">{tenant.name}</h3>
+                          <p className="text-blue-400 text-xs mb-3">{tenant.domain}</p>
+
+                          <div className="space-y-1 text-xs text-gray-400 mb-3">
+                            <div className="flex items-center space-x-1">
+                              <span>📧</span>
+                              <span className="truncate">{tenant.owner_email}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span>👥</span>
+                              <span>{tenant.user_count || 0} users</span>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleManage(tenant)}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg transition text-xs font-medium"
+                          >
+                            Manage
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div className="flex flex-col items-end space-y-1">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    tenant.status === 'active' 
-                      ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500' 
-                      : 'bg-red-500 bg-opacity-10 text-red-400 border border-red-500'
-                  }`}>
-                    {tenant.status}
-                  </span>
-                  {tenant.tenant_type === 'msp' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500 bg-opacity-10 text-purple-400 border border-purple-500">
-                      MSP
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <h3 className="text-xl font-bold text-white mb-2">{tenant.name}</h3>
-              <p className="text-purple-400 text-sm mb-4">{tenant.domain}</p>
-              
-              <div className="space-y-2 text-sm text-gray-400 mb-4">
-                <div className="flex items-center space-x-2">
-                  <span>📧</span>
-                  <span>{tenant.owner_email}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span>📅</span>
-                  <span>Created {new Date(tenant.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-
-              <div className="flex space-x-2">
-                <button 
-                  onClick={() => handleManage(tenant)}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium"
-                >
-                  Manage
-                </button>
-                {tenant.tenant_type === 'msp' && (
-                  <button 
-                    onClick={() => handleAddSubTenant(tenant)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium"
-                  >
-                    + Client
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+              )
+            })
+          })()}
         </div>
       )}
 
@@ -474,6 +575,29 @@ function TenantsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* MSP Management (Global Admin Only) */}
+              {(() => {
+                const user = JSON.parse(localStorage.getItem('user'))
+                const isGlobalAdmin = user?.role === 'global_admin' || user?.role === 'admin'
+                return isGlobalAdmin && selectedTenant.tenant_type !== 'msp' && !selectedTenant.parent_tenant_id && (
+                  <div className="border-t border-gray-700 pt-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">MSP Management</h3>
+                    <button
+                      type="button"
+                      onClick={handleConvertToMSP}
+                      disabled={saving}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      <span>🏢</span>
+                      <span>Convert to MSP</span>
+                    </button>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Converting to MSP allows this tenant to manage multiple client sub-tenants
+                    </p>
+                  </div>
+                )
+              })()}
 
               {/* Actions */}
               <div className="flex justify-between pt-6 border-t border-gray-700">
