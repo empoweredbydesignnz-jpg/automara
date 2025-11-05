@@ -9,72 +9,42 @@ function TenantsPage() {
   const [selectedTenant, setSelectedTenant] = useState(null)
   const [saving, setSaving] = useState(false)
   const [newTenant, setNewTenant] = useState({
+ name: '',
+    domain: '',
+    owner_email: ''
+  })
+  const [showSubTenantModal, setShowSubTenantModal] = useState(false)
+  const [parentTenant, setParentTenant] = useState(null)
+  const [newSubTenant, setNewSubTenant] = useState({
     name: '',
     domain: '',
     owner_email: ''
   })
 
-  useEffect(() => {
-    fetchTenants()
-  }, [])
-
-  const fetchTenants = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.get('/api/tenants', {
-        headers: {
-          'x-user-role': user?.role || 'client',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      });
-      setTenants(response.data.tenants || [])
-    } catch (error) {
-      console.error('Error fetching tenants:', error)
-      setTenants([])
-    } finally {
-      setLoading(false)
-    }
+  const handleAddSubTenant = (tenant) => {
+    setParentTenant(tenant)
+    setShowSubTenantModal(true)
   }
 
-  const handleAddTenant = async (e) => {
+  const handleCreateSubTenant = async (e) => {
     e.preventDefault()
     try {
-      await axios.post('/api/tenants', newTenant)
-      setShowAddModal(false)
-      setNewTenant({ name: '', domain: '', owner_email: '' })
-      fetchTenants()
-    } catch (error) {
-      console.error('Error adding tenant:', error)
-    }
-  }
-
-  const handleManage = (tenant) => {
-    setSelectedTenant({...tenant})
-    setShowManageModal(true)
-  }
-const handleUpdateTenant = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      await axios.put(`/api/tenants/${selectedTenant.id}`, selectedTenant, {
+      const user = JSON.parse(localStorage.getItem('user'))
+      await axios.post(`/api/tenants/${parentTenant.id}/sub-tenants`, newSubTenant, {
         headers: {
-          'x-user-role': user?.role || 'client',
+          'x-user-role': user?.role || 'client_user',
           'x-tenant-id': user?.tenantId || ''
         }
       })
-      setShowManageModal(false)
-      setSelectedTenant(null)
+      setShowSubTenantModal(false)
+      setNewSubTenant({ name: '', domain: '', owner_email: '' })
       fetchTenants()
-      alert('Tenant updated successfully!')
     } catch (error) {
-      console.error('Error updating tenant:', error)
-      alert('Failed to update tenant')
-    } finally {
-      setSaving(false)
+      console.error('Error creating sub-tenant:', error)
+      alert(error.response?.data?.error || 'Failed to create sub-tenant')
     }
-  }
+  }  
+    
 
 const handleDeleteTenant = async () => {
     if (!confirm(`Are you sure you want to delete ${selectedTenant.name}? This action cannot be undone.`)) {
@@ -160,19 +130,33 @@ const handleDeleteTenant = async () => {
           {tenants.map((tenant) => (
             <div
               key={tenant.id}
-              className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition group"
+              className={`bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition group ${
+                tenant.parent_tenant_id ? 'ml-8 border-l-4 border-l-blue-500' : ''
+              }`}
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
-                  {tenant.name.charAt(0)}
+                <div className="flex items-center space-x-2">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                    {tenant.name.charAt(0)}
+                  </div>
+                  {tenant.parent_tenant_id && (
+                    <span className="text-xs text-blue-400">↳ Sub-tenant</span>
+                  )}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  tenant.status === 'active' 
-                    ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500' 
-                    : 'bg-red-500 bg-opacity-10 text-red-400 border border-red-500'
-                }`}>
-                  {tenant.status}
-                </span>
+                <div className="flex flex-col items-end space-y-1">
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    tenant.status === 'active' 
+                      ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500' 
+                      : 'bg-red-500 bg-opacity-10 text-red-400 border border-red-500'
+                  }`}>
+                    {tenant.status}
+                  </span>
+                  {tenant.tenant_type === 'msp' && (
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500 bg-opacity-10 text-purple-400 border border-purple-500">
+                      MSP
+                    </span>
+                  )}
+                </div>
               </div>
 
               <h3 className="text-xl font-bold text-white mb-2">{tenant.name}</h3>
@@ -196,13 +180,22 @@ const handleDeleteTenant = async () => {
                 >
                   Manage
                 </button>
-                <button className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition text-sm font-medium">
-                  Details
-                </button>
+                {tenant.tenant_type === 'msp' && (
+                  <button 
+                    onClick={() => handleAddSubTenant(tenant)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium"
+                  >
+                    + Client
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
+
+             
+               
+               
       )}
 
       {/* Add Tenant Modal */}
@@ -261,6 +254,70 @@ const handleDeleteTenant = async () => {
                   className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 px-4 rounded-lg transition font-medium"
                 >
                   Add Tenant
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+ 
+      {/* Add Sub-Tenant Modal */}
+      {showSubTenantModal && parentTenant && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl p-8 max-w-md w-full border border-gray-700">
+            <h2 className="text-2xl font-bold text-white mb-4">Add Client to {parentTenant.name}</h2>
+            <p className="text-gray-400 mb-6">Create a new sub-tenant for this MSP</p>
+            
+            <form onSubmit={handleCreateSubTenant} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Client Name</label>
+                <input
+                  type="text"
+                  value={newSubTenant.name}
+                  onChange={(e) => setNewSubTenant({ ...newSubTenant, name: e.target.value })}
+                  placeholder="Client Company Name"
+                  required
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Domain</label>
+                <input
+                  type="text"
+                  value={newSubTenant.domain}
+                  onChange={(e) => setNewSubTenant({ ...newSubTenant, domain: e.target.value })}
+                  placeholder="client.stratusblue.automara.com"
+                  required
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Owner Email</label>
+                <input
+                  type="email"
+                  value={newSubTenant.owner_email}
+                  onChange={(e) => setNewSubTenant({ ...newSubTenant, owner_email: e.target.value })}
+                  placeholder="admin@client.com"
+                  required
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowSubTenantModal(false)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-4 rounded-lg transition font-medium"
+                >
+                  Create Client
                 </button>
               </div>
             </form>
