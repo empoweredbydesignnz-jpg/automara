@@ -9,7 +9,7 @@ function TenantsPage() {
   const [selectedTenant, setSelectedTenant] = useState(null)
   const [saving, setSaving] = useState(false)
   const [newTenant, setNewTenant] = useState({
-    name: '',
+ name: '',
     domain: '',
     owner_email: ''
   })
@@ -20,86 +20,6 @@ function TenantsPage() {
     domain: '',
     owner_email: ''
   })
-
-  useEffect(() => {
-    fetchTenants()
-  }, [])
-
-  const fetchTenants = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'))
-      console.log('Fetching tenants with role:', user?.role)
-      
-      const response = await axios.get('/api/tenants', {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      })
-      
-      console.log('Tenants response:', response.data)
-      setTenants(response.data.tenants || [])
-    } catch (error) {
-      console.error('Error fetching tenants:', error)
-      console.error('Error details:', error.response?.data)
-      alert('Failed to load tenants: ' + (error.response?.data?.error || error.message))
-      setTenants([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleManage = (tenant) => {
-    setSelectedTenant(tenant)
-    setShowManageModal(true)
-  }
-
-  const handleAddTenant = async (e) => {
-    e.preventDefault()
-    try {
-      const user = JSON.parse(localStorage.getItem('user'))
-      await axios.post('/api/tenants', newTenant, {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      })
-      setShowAddModal(false)
-      setNewTenant({ name: '', domain: '', owner_email: '' })
-      fetchTenants()
-      alert('Tenant created successfully!')
-    } catch (error) {
-      console.error('Error adding tenant:', error)
-      alert('Failed to create tenant: ' + (error.response?.data?.error || error.message))
-    }
-  }
-
-  const handleUpdateTenant = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      const user = JSON.parse(localStorage.getItem('user'))
-      await axios.put(`/api/tenants/${selectedTenant.id}`, {
-        name: selectedTenant.name,
-        domain: selectedTenant.domain,
-        owner_email: selectedTenant.owner_email
-      }, {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      })
-      setShowManageModal(false)
-      setSelectedTenant(null)
-      fetchTenants()
-      alert('Tenant updated successfully!')
-    } catch (error) {
-      console.error('Error updating tenant:', error)
-      alert('Failed to update tenant: ' + (error.response?.data?.error || error.message))
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const handleAddSubTenant = (tenant) => {
     setParentTenant(tenant)
@@ -123,9 +43,10 @@ function TenantsPage() {
       console.error('Error creating sub-tenant:', error)
       alert(error.response?.data?.error || 'Failed to create sub-tenant')
     }
-  }
+  }  
+    
 
-  const handleDeleteTenant = async () => {
+const handleDeleteTenant = async () => {
     if (!confirm(`Are you sure you want to delete ${selectedTenant.name}? This action cannot be undone.`)) {
       return
     }
@@ -271,6 +192,10 @@ function TenantsPage() {
             </div>
           ))}
         </div>
+
+             
+               
+               
       )}
 
       {/* Add Tenant Modal */}
