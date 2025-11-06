@@ -92,6 +92,7 @@ services:
       DB_USER: automara
       DB_PASSWORD: automara
       DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/tenant-signup}
     ports:
       - "4000:4000"
     depends_on:

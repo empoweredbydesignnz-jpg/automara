@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -165,7 +166,7 @@ app.get('/api/tenants', filterTenantsByRole, async (req, res) => {
     
     if (effectiveRole === 'global_admin') {
       // Global admin sees ALL tenants (top-level only, not sub-tenants)
-      query = 'SELECT * FROM client_tenants WHERE parent_tenant_id IS NULL ORDER BY created_at DESC';
+      query = 'SELECT * FROM client_tenants ORDER BY parent_tenant_id NULLS FIRST, created_at DESC';
       console.log('Global admin query:', query);
     } else if (effectiveRole === 'client_admin') {
       // Client admin sees their own tenant AND their sub-tenants
@@ -175,7 +176,6 @@ app.get('/api/tenants', filterTenantsByRole, async (req, res) => {
       }
       query = `
         SELECT * FROM client_tenants 
-        WHERE id = $1 OR parent_tenant_id = $1 
         ORDER BY parent_tenant_id NULLS FIRST, created_at DESC
       `;
       params = [req.tenantId];
@@ -281,13 +281,43 @@ app.post('/api/tenants', filterTenantsByRole, async (req, res) => {
   const { name, domain, owner_email, owner_first_name, owner_last_name } = req.body;
   
   try {
+    // Create tenant in database
     const result = await pool.query(
       'INSERT INTO client_tenants (name, domain, owner_email, status, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *',
       [name, domain, owner_email, 'active']
     );
+    
+    const newTenant = result.rows[0];
+    
+    // Send to n8n webhook
+    try {
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://n8n:5678/webhook/tenant-signup';
+      
+      await axios.post(n8nWebhookUrl, {
+        tenant: {
+          id: newTenant.id,
+          name: newTenant.name,
+          domain: newTenant.domain,
+          owner_email: newTenant.owner_email
+        },
+        owner: {
+          email: owner_email,
+          first_name: owner_first_name || owner_email.split('@')[0],
+          last_name: owner_last_name || ''
+        }
+      }, {
+        timeout: 5000
+      });
+      
+      console.log('Sent tenant signup to n8n');
+    } catch (n8nError) {
+      console.error('Failed to notify n8n:', n8nError.message);
+      // Don't fail the signup if n8n is down
+    }
+    
     res.status(201).json({ 
       success: true,
-      tenant: result.rows[0] 
+      tenant: newTenant 
     });
   } catch (error) {
     console.error('Error creating tenant:', error);
