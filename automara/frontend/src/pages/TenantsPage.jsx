@@ -475,6 +475,24 @@ function TenantsPage() {
                 </div>
               </div>
 
+              {/* Sub-Tenants Management - Only for MSP tenants */}
+              {selectedTenant.tenant_type === 'msp' && (
+                <div className="border-t border-gray-700 pt-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Sub-Tenants</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowManageModal(false);
+                      window.location.href = `/tenants/${selectedTenant.id}/sub-tenants`;
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition font-medium flex items-center justify-center space-x-2"
+                  >
+                    <span>📋</span>
+                    <span>Manage Sub-Tenants</span>
+                  </button>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex justify-between pt-6 border-t border-gray-700">
                 <button
