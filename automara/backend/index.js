@@ -150,52 +150,89 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Tenants endpoint - hierarchical
+// Tenants endpoint - hierarchical with STRICT MSP isolation
 app.get('/api/tenants', filterTenantsByRole, async (req, res) => {
   console.log('=== TENANTS API DEBUG ===');
   console.log('req.userRole:', req.userRole);
   console.log('req.tenantId:', req.tenantId);
-  
+
   try {
     let query;
     let params = [];
-    
+
     // Map 'admin' to 'global_admin' for backward compatibility
     const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
-    
+
     if (effectiveRole === 'global_admin') {
-      // Global admin sees ALL tenants (top-level only, not sub-tenants)
-      query = 'SELECT * FROM client_tenants WHERE parent_tenant_id IS NULL ORDER BY created_at DESC';
-      console.log('Global admin query:', query);
+      // Global admin sees ALL tenants across ALL MSPs (including sub-tenants)
+      query = `
+        SELECT
+          t.*,
+          (SELECT COUNT(*) FROM client_tenants WHERE parent_tenant_id = t.id) as sub_tenant_count,
+          (SELECT COUNT(*) FROM users WHERE tenant_id = t.id) as user_count
+        FROM client_tenants t
+        ORDER BY
+          COALESCE(t.msp_root_id, t.id),
+          CASE WHEN t.parent_tenant_id IS NULL THEN 0 ELSE 1 END,
+          t.created_at DESC
+      `;
+      console.log('Global admin query: ALL tenants across all MSPs');
     } else if (effectiveRole === 'client_admin') {
-      // Client admin sees their own tenant AND their sub-tenants
+      // Client admin sees ONLY tenants within their MSP hierarchy (strict isolation)
       if (!req.tenantId) {
         console.log('Client admin but no tenantId - returning 403');
         return res.status(403).json({ error: 'Access denied - no tenant ID' });
       }
+
+      // First get the user's MSP root ID
+      const mspRootResult = await pool.query(
+        'SELECT msp_root_id FROM client_tenants WHERE id = $1',
+        [req.tenantId]
+      );
+
+      if (mspRootResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+
+      const mspRootId = mspRootResult.rows[0].msp_root_id;
+
+      // Return all tenants within this MSP hierarchy ONLY
       query = `
-        SELECT * FROM client_tenants 
-        WHERE id = $1 OR parent_tenant_id = $1 
-        ORDER BY parent_tenant_id NULLS FIRST, created_at DESC
+        SELECT
+          t.*,
+          (SELECT COUNT(*) FROM client_tenants WHERE parent_tenant_id = t.id) as sub_tenant_count,
+          (SELECT COUNT(*) FROM users WHERE tenant_id = t.id) as user_count
+        FROM client_tenants t
+        WHERE t.msp_root_id = $1
+        ORDER BY
+          CASE WHEN t.parent_tenant_id IS NULL THEN 0 ELSE 1 END,
+          t.created_at DESC
       `;
-      params = [req.tenantId];
-      console.log('Client admin query:', query, 'params:', params);
+      params = [mspRootId];
+      console.log('Client admin query: tenants with msp_root_id =', mspRootId);
     } else {
       // Client user sees only their own tenant
       if (!req.tenantId) {
         console.log('Client user but no tenantId - returning 403');
         return res.status(403).json({ error: 'Access denied - no tenant ID' });
       }
-      query = 'SELECT * FROM client_tenants WHERE id = $1';
+      query = `
+        SELECT
+          t.*,
+          (SELECT COUNT(*) FROM client_tenants WHERE parent_tenant_id = t.id) as sub_tenant_count,
+          (SELECT COUNT(*) FROM users WHERE tenant_id = t.id) as user_count
+        FROM client_tenants t
+        WHERE t.id = $1
+      `;
       params = [req.tenantId];
-      console.log('Client user query:', query, 'params:', params);
+      console.log('Client user query: tenant id =', req.tenantId);
     }
-    
+
     console.log('Executing query...');
     const result = await pool.query(query, params);
     console.log('Query result rows:', result.rows.length);
     console.log('Tenants:', result.rows);
-    
+
     res.json({ tenants: result.rows });
   } catch (error) {
     console.error('Error fetching tenants:', error);
@@ -204,47 +241,65 @@ app.get('/api/tenants', filterTenantsByRole, async (req, res) => {
   }
 });
 
-// Create sub-tenant (for MSP tenants)
+// Create sub-tenant (for MSP tenants) with STRICT MSP boundary checks
 app.post('/api/tenants/:parentId/sub-tenants', filterTenantsByRole, async (req, res) => {
   const { parentId } = req.params;
   const { name, domain, owner_email } = req.body;
   const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
-  
-  // Only client_admin of the parent tenant or global_admin can create sub-tenants
-  if (effectiveRole !== 'global_admin' && (effectiveRole !== 'client_admin' || req.tenantId != parentId)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  
+
   try {
     // Verify parent tenant exists and is MSP type
     const parentCheck = await pool.query(
-      'SELECT id, tenant_type FROM client_tenants WHERE id = $1',
+      'SELECT id, tenant_type, msp_root_id FROM client_tenants WHERE id = $1',
       [parentId]
     );
-    
+
     if (parentCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Parent tenant not found' });
     }
-    
-    if (parentCheck.rows[0].tenant_type !== 'msp') {
+
+    const parentTenant = parentCheck.rows[0];
+
+    if (parentTenant.tenant_type !== 'msp') {
       return res.status(400).json({ error: 'Parent tenant must be MSP type to create sub-tenants' });
     }
-    
+
+    // STRICT MSP ISOLATION: Verify user has access to this MSP hierarchy
+    if (effectiveRole !== 'global_admin') {
+      if (effectiveRole !== 'client_admin') {
+        return res.status(403).json({ error: 'Only admins can create sub-tenants' });
+      }
+
+      // Get user's MSP root to verify they're in the same hierarchy
+      const userMspCheck = await pool.query(
+        'SELECT msp_root_id FROM client_tenants WHERE id = $1',
+        [req.tenantId]
+      );
+
+      if (userMspCheck.rows.length === 0 ||
+          userMspCheck.rows[0].msp_root_id !== parentTenant.msp_root_id) {
+        return res.status(403).json({
+          error: 'Access denied: Cannot create sub-tenants for other MSPs'
+        });
+      }
+    }
+
+    // Create the sub-tenant (msp_root_id will be set automatically by trigger)
     const result = await pool.query(
-      `INSERT INTO client_tenants (name, domain, owner_email, status, parent_tenant_id, tenant_type, created_at) 
+      `INSERT INTO client_tenants (name, domain, owner_email, status, parent_tenant_id, tenant_type, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *`,
       [name, domain, owner_email, 'active', parentId, 'sub_tenant']
     );
-    
-    res.status(201).json({ 
+
+    res.status(201).json({
       success: true,
-      tenant: result.rows[0] 
+      tenant: result.rows[0]
     });
   } catch (error) {
     console.error('Error creating sub-tenant:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -374,28 +429,57 @@ app.get('/api/roles', async (req, res) => {
   }
 });
 
-// Get all users (admin only)
+// Get all users (admin only) with STRICT MSP isolation
 app.get('/api/users', filterTenantsByRole, async (req, res) => {
   const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
-  
+
   if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin') {
     return res.status(403).json({ error: 'Access denied' });
   }
-  
+
   try {
     let query;
     let params = [];
-    
+
     if (effectiveRole === 'global_admin') {
-      // Global admin sees all users
-      query = 'SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name FROM users u LEFT JOIN client_tenants t ON u.tenant_id = t.id ORDER BY u.created_at DESC';
+      // Global admin sees all users across all MSPs
+      query = `
+        SELECT
+          u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status,
+          t.name as tenant_name, t.tenant_type, t.msp_root_id
+        FROM users u
+        LEFT JOIN client_tenants t ON u.tenant_id = t.id
+        ORDER BY u.created_at DESC
+      `;
     } else if (effectiveRole === 'client_admin') {
-      // Client admin sees only users in their tenant
+      // Client admin sees ONLY users within their MSP hierarchy (strict isolation)
       const tenantId = req.tenantId;
-      query = 'SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name FROM users u LEFT JOIN client_tenants t ON u.tenant_id = t.id WHERE u.tenant_id = $1 ORDER BY u.created_at DESC';
-      params = [tenantId];
+
+      // Get the MSP root ID for this admin
+      const mspRootResult = await pool.query(
+        'SELECT msp_root_id FROM client_tenants WHERE id = $1',
+        [tenantId]
+      );
+
+      if (mspRootResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+
+      const mspRootId = mspRootResult.rows[0].msp_root_id;
+
+      // Return users only from tenants within this MSP hierarchy
+      query = `
+        SELECT
+          u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status,
+          t.name as tenant_name, t.tenant_type, t.msp_root_id
+        FROM users u
+        LEFT JOIN client_tenants t ON u.tenant_id = t.id
+        WHERE t.msp_root_id = $1
+        ORDER BY u.created_at DESC
+      `;
+      params = [mspRootId];
     }
-    
+
     const result = await pool.query(query, params);
     res.json({ users: result.rows });
   } catch (error) {
@@ -433,6 +517,218 @@ app.patch('/api/users/:id/role', filterTenantsByRole, async (req, res) => {
     res.json({ success: true, user: result.rows[0] });
   } catch (error) {
     console.error('Error updating user role:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// MSP MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// Get MSP statistics (for admins)
+app.get('/api/msp/stats', filterTenantsByRole, async (req, res) => {
+  const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
+
+  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  try {
+    let mspRootId;
+
+    if (effectiveRole === 'client_admin') {
+      // Get the MSP root for this admin
+      const result = await pool.query(
+        'SELECT msp_root_id FROM client_tenants WHERE id = $1',
+        [req.tenantId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+
+      mspRootId = result.rows[0].msp_root_id;
+    }
+
+    let query;
+    let params = [];
+
+    if (effectiveRole === 'global_admin') {
+      // Global admin sees stats for ALL MSPs
+      query = `
+        SELECT
+          t.id as msp_id,
+          t.name as msp_name,
+          t.domain as msp_domain,
+          t.tenant_type,
+          COUNT(DISTINCT sub.id) as total_clients,
+          COUNT(DISTINCT u.id) as total_users,
+          COUNT(DISTINCT CASE WHEN u.status = 'active' THEN u.id END) as active_users
+        FROM client_tenants t
+        LEFT JOIN client_tenants sub ON sub.msp_root_id = t.id AND sub.id != t.id
+        LEFT JOIN users u ON u.tenant_id = sub.id OR u.tenant_id = t.id
+        WHERE t.parent_tenant_id IS NULL
+        GROUP BY t.id, t.name, t.domain, t.tenant_type
+        ORDER BY t.name
+      `;
+    } else {
+      // Client admin sees stats for their MSP only
+      query = `
+        SELECT
+          t.id as msp_id,
+          t.name as msp_name,
+          t.domain as msp_domain,
+          t.tenant_type,
+          COUNT(DISTINCT sub.id) as total_clients,
+          COUNT(DISTINCT u.id) as total_users,
+          COUNT(DISTINCT CASE WHEN u.status = 'active' THEN u.id END) as active_users
+        FROM client_tenants t
+        LEFT JOIN client_tenants sub ON sub.msp_root_id = t.id AND sub.id != t.id
+        LEFT JOIN users u ON u.tenant_id = sub.id OR u.tenant_id = t.id
+        WHERE t.id = $1
+        GROUP BY t.id, t.name, t.domain, t.tenant_type
+      `;
+      params = [mspRootId];
+    }
+
+    const result = await pool.query(query, params);
+    res.json({ stats: result.rows });
+  } catch (error) {
+    console.error('Error fetching MSP stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Convert tenant to MSP (global admin only)
+app.post('/api/tenants/:id/convert-to-msp', filterTenantsByRole, async (req, res) => {
+  const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
+  const { id } = req.params;
+
+  if (effectiveRole !== 'global_admin') {
+    return res.status(403).json({ error: 'Only global admin can convert tenants to MSP' });
+  }
+
+  try {
+    // Verify tenant exists and is not already an MSP
+    const tenantCheck = await pool.query(
+      'SELECT id, tenant_type, parent_tenant_id FROM client_tenants WHERE id = $1',
+      [id]
+    );
+
+    if (tenantCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const tenant = tenantCheck.rows[0];
+
+    if (tenant.tenant_type === 'msp') {
+      return res.status(400).json({ error: 'Tenant is already an MSP' });
+    }
+
+    if (tenant.parent_tenant_id !== null) {
+      return res.status(400).json({
+        error: 'Cannot convert sub-tenant to MSP. Only top-level tenants can become MSPs.'
+      });
+    }
+
+    // Convert to MSP and update msp_root_id
+    const result = await pool.query(
+      `UPDATE client_tenants
+       SET tenant_type = 'msp', msp_root_id = $1, updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Tenant converted to MSP successfully',
+      tenant: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error converting tenant to MSP:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get MSP hierarchy tree (for visualization)
+app.get('/api/msp/hierarchy', filterTenantsByRole, async (req, res) => {
+  const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
+
+  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  try {
+    let query;
+    let params = [];
+
+    if (effectiveRole === 'global_admin') {
+      // Global admin sees full hierarchy across all MSPs
+      query = `
+        WITH RECURSIVE hierarchy AS (
+          SELECT
+            t.id, t.name, t.domain, t.tenant_type, t.parent_tenant_id,
+            t.msp_root_id, t.status, t.owner_email,
+            0 AS level,
+            ARRAY[t.id] AS path
+          FROM client_tenants t
+          WHERE t.parent_tenant_id IS NULL
+
+          UNION ALL
+
+          SELECT
+            t.id, t.name, t.domain, t.tenant_type, t.parent_tenant_id,
+            t.msp_root_id, t.status, t.owner_email,
+            h.level + 1,
+            h.path || t.id
+          FROM client_tenants t
+          INNER JOIN hierarchy h ON t.parent_tenant_id = h.id
+        )
+        SELECT * FROM hierarchy ORDER BY path
+      `;
+    } else {
+      // Client admin sees only their MSP hierarchy
+      const mspResult = await pool.query(
+        'SELECT msp_root_id FROM client_tenants WHERE id = $1',
+        [req.tenantId]
+      );
+
+      if (mspResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+
+      const mspRootId = mspResult.rows[0].msp_root_id;
+
+      query = `
+        WITH RECURSIVE hierarchy AS (
+          SELECT
+            t.id, t.name, t.domain, t.tenant_type, t.parent_tenant_id,
+            t.msp_root_id, t.status, t.owner_email,
+            0 AS level,
+            ARRAY[t.id] AS path
+          FROM client_tenants t
+          WHERE t.id = $1
+
+          UNION ALL
+
+          SELECT
+            t.id, t.name, t.domain, t.tenant_type, t.parent_tenant_id,
+            t.msp_root_id, t.status, t.owner_email,
+            h.level + 1,
+            h.path || t.id
+          FROM client_tenants t
+          INNER JOIN hierarchy h ON t.parent_tenant_id = h.id
+        )
+        SELECT * FROM hierarchy ORDER BY path
+      `;
+      params = [mspRootId];
+    }
+
+    const result = await pool.query(query, params);
+    res.json({ hierarchy: result.rows });
+  } catch (error) {
+    console.error('Error fetching MSP hierarchy:', error);
     res.status(500).json({ error: error.message });
   }
 });
