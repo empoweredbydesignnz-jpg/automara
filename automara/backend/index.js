@@ -156,46 +156,51 @@ app.get('/api/tenants', filterTenantsByRole, async (req, res) => {
   console.log('=== TENANTS API DEBUG ===');
   console.log('req.userRole:', req.userRole);
   console.log('req.tenantId:', req.tenantId);
-  
+
   try {
     let query;
     let params = [];
-    
-    // Map 'admin' to 'global_admin' for backward compatibility
-    const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
-    
+
+    // Map roles
+    const effectiveRole =
+      req.userRole === 'admin'
+        ? 'global_admin'
+        : req.userRole === 'msp_admin'
+        ? 'msp_admin'
+        : req.userRole;
+
     if (effectiveRole === 'global_admin') {
-      // Global admin sees ALL tenants (top-level only, not sub-tenants)
+      // Global admin sees ALL tenants
       query = 'SELECT * FROM client_tenants ORDER BY parent_tenant_id NULLS FIRST, created_at DESC';
       console.log('Global admin query:', query);
-    } else if (effectiveRole === 'client_admin') {
-      // Client admin sees their own tenant AND their sub-tenants
+    } else if (effectiveRole === 'client_admin' || effectiveRole === 'msp_admin') {
       if (!req.tenantId) {
-        console.log('Client admin but no tenantId - returning 403');
         return res.status(403).json({ error: 'Access denied - no tenant ID' });
       }
+
+      // Client admin or MSP admin sees their own tenant and sub-tenants
       query = `
-        SELECT * FROM client_tenants 
+        SELECT * FROM client_tenants
+        WHERE id = $1 OR parent_tenant_id = $1
         ORDER BY parent_tenant_id NULLS FIRST, created_at DESC
       `;
       params = [req.tenantId];
-      console.log('Client admin query:', query, 'params:', params);
+      console.log('Client/MSP admin query:', query, 'params:', params);
     } else {
-      // Client user sees only their own tenant
+      // Regular client sees only their own tenant
       if (!req.tenantId) {
-        console.log('Client user but no tenantId - returning 403');
         return res.status(403).json({ error: 'Access denied - no tenant ID' });
       }
       query = 'SELECT * FROM client_tenants WHERE id = $1';
       params = [req.tenantId];
       console.log('Client user query:', query, 'params:', params);
     }
-    
+
     console.log('Executing query...');
     const result = await pool.query(query, params);
     console.log('Query result rows:', result.rows.length);
     console.log('Tenants:', result.rows);
-    
+
     res.json({ tenants: result.rows });
   } catch (error) {
     console.error('Error fetching tenants:', error);
@@ -204,16 +209,25 @@ app.get('/api/tenants', filterTenantsByRole, async (req, res) => {
   }
 });
 
+
 // Create sub-tenant (for MSP tenants)
 app.post('/api/tenants/:parentId/sub-tenants', filterTenantsByRole, async (req, res) => {
   const { parentId } = req.params;
   const { name, domain, owner_email } = req.body;
-  const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
+  const effectiveRole =
+  req.userRole === 'admin' ? 'global_admin' :
+  req.userRole === 'msp_admin' ? 'msp_admin' :
+  req.userRole;
+
   
-  // Only client_admin of the parent tenant or global_admin can create sub-tenants
-  if (effectiveRole !== 'global_admin' && (effectiveRole !== 'client_admin' || req.tenantId != parentId)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
+  // Only client_admin or msp_admin of the parent tenant, or global_admin, can create sub-tenants
+if (
+  effectiveRole !== 'global_admin' &&
+  (effectiveRole !== 'client_admin' && effectiveRole !== 'msp_admin' || req.tenantId != parentId)
+) {
+  return res.status(403).json({ error: 'Access denied' });
+}
+
   
   try {
     // Verify parent tenant exists and is MSP type
@@ -253,7 +267,11 @@ app.post('/api/tenants/:parentId/sub-tenants', filterTenantsByRole, async (req, 
 app.patch('/api/tenants/:id/type', filterTenantsByRole, async (req, res) => {
   const { id } = req.params;
   const { tenant_type } = req.body;
-  const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
+  const effectiveRole =
+  req.userRole === 'admin' ? 'global_admin' :
+  req.userRole === 'msp_admin' ? 'msp_admin' :
+  req.userRole;
+
   
   if (effectiveRole !== 'global_admin') {
     return res.status(403).json({ error: 'Only global admin can change tenant type' });
@@ -276,18 +294,32 @@ app.patch('/api/tenants/:id/type', filterTenantsByRole, async (req, res) => {
   }
 });
 
-// Create tenant endpoint (for signup)
+/// Create tenant endpoint (for signup)
 app.post('/api/tenants', filterTenantsByRole, async (req, res) => {
-  const { name, domain, owner_email, owner_first_name, owner_last_name } = req.body;
+  const { name, domain, owner_email, owner_first_name, owner_last_name, tenant_type } = req.body;
   
   try {
+    // Default to 'client' if not specified
+    const finalTenantType = tenant_type || 'client';
+    
     // Create tenant in database
     const result = await pool.query(
-      'INSERT INTO client_tenants (name, domain, owner_email, status, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *',
-      [name, domain, owner_email, 'active']
+      'INSERT INTO client_tenants (name, domain, owner_email, status, tenant_type, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
+      [name, domain, owner_email, 'active', finalTenantType]
     );
     
     const newTenant = result.rows[0];
+    
+    // Determine role based on tenant type
+    const userRole = finalTenantType === 'msp' ? 'msp_admin' : 'client_admin';
+    
+    // Create owner user with appropriate role
+    const userResult = await pool.query(
+      'INSERT INTO users (email, first_name, last_name, role, tenant_id, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+      [owner_email, owner_first_name || owner_email.split('@')[0], owner_last_name || '', userRole, newTenant.id, 'active']
+    );
+    
+    console.log(`Created ${userRole} user for tenant:`, newTenant.id);
     
     // Send to n8n webhook
     try {
@@ -298,12 +330,14 @@ app.post('/api/tenants', filterTenantsByRole, async (req, res) => {
           id: newTenant.id,
           name: newTenant.name,
           domain: newTenant.domain,
-          owner_email: newTenant.owner_email
+          owner_email: newTenant.owner_email,
+          tenant_type: newTenant.tenant_type
         },
         owner: {
           email: owner_email,
           first_name: owner_first_name || owner_email.split('@')[0],
-          last_name: owner_last_name || ''
+          last_name: owner_last_name || '',
+          role: userRole
         }
       }, {
         timeout: 5000
@@ -312,12 +346,12 @@ app.post('/api/tenants', filterTenantsByRole, async (req, res) => {
       console.log('Sent tenant signup to n8n');
     } catch (n8nError) {
       console.error('Failed to notify n8n:', n8nError.message);
-      // Don't fail the signup if n8n is down
     }
     
     res.status(201).json({ 
       success: true,
-      tenant: newTenant 
+      tenant: newTenant,
+      user: userResult.rows[0]
     });
   } catch (error) {
     console.error('Error creating tenant:', error);
@@ -325,28 +359,6 @@ app.post('/api/tenants', filterTenantsByRole, async (req, res) => {
       success: false,
       error: error.message 
     });
-  }
-});
-
-// Update tenant
-app.put('/api/tenants/:id', filterTenantsByRole, async (req, res) => {
-  const { id } = req.params;
-  const { name, domain, owner_email } = req.body;
-  
-  try {
-    const result = await pool.query(
-      'UPDATE client_tenants SET name = $1, domain = $2, owner_email = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-      [name, domain, owner_email, id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' });
-    }
-    
-    res.json({ success: true, tenant: result.rows[0] });
-  } catch (error) {
-    console.error('Error updating tenant:', error);
-    res.status(500).json({ error: error.message });
   }
 });
 
@@ -408,7 +420,7 @@ app.get('/api/roles', async (req, res) => {
 app.get('/api/users', filterTenantsByRole, async (req, res) => {
   const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
   
-  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin') {
+  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin' && effectiveRole !== 'msp_admin') {
     return res.status(403).json({ error: 'Access denied' });
   }
   
@@ -417,14 +429,40 @@ app.get('/api/users', filterTenantsByRole, async (req, res) => {
     let params = [];
     
     if (effectiveRole === 'global_admin') {
-      // Global admin sees all users
-      query = 'SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name FROM users u LEFT JOIN client_tenants t ON u.tenant_id = t.id ORDER BY u.created_at DESC';
-    } else if (effectiveRole === 'client_admin') {
-      // Client admin sees only users in their tenant
-      const tenantId = req.tenantId;
-      query = 'SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name FROM users u LEFT JOIN client_tenants t ON u.tenant_id = t.id WHERE u.tenant_id = $1 ORDER BY u.created_at DESC';
-      params = [tenantId];
-    }
+  query = `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name
+    FROM users u
+    LEFT JOIN client_tenants t ON u.tenant_id = t.id
+    ORDER BY u.created_at DESC
+  `;
+} else if (effectiveRole === 'msp_admin') {
+  if (!req.tenantId) return res.status(403).json({ error: 'Access denied - no tenant ID' });
+
+  query = `
+    WITH RECURSIVE sub_tenants AS (
+      SELECT id FROM client_tenants WHERE id = $1
+      UNION ALL
+      SELECT ct.id FROM client_tenants ct
+      INNER JOIN sub_tenants st ON ct.parent_tenant_id = st.id
+    )
+    SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name
+    FROM users u
+    JOIN sub_tenants st ON u.tenant_id = st.id
+    LEFT JOIN client_tenants t ON u.tenant_id = t.id
+    ORDER BY u.created_at DESC
+  `;
+  params = [req.tenantId];
+} else if (effectiveRole === 'client_admin') {
+  query = `
+    SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name
+    FROM users u
+    LEFT JOIN client_tenants t ON u.tenant_id = t.id
+    WHERE u.tenant_id = $1
+    ORDER BY u.created_at DESC
+  `;
+  params = [req.tenantId];
+}
+
+
     
     const result = await pool.query(query, params);
     res.json({ users: result.rows });
@@ -436,12 +474,12 @@ app.get('/api/users', filterTenantsByRole, async (req, res) => {
 
 // Update user role (admin only)
 app.patch('/api/users/:id/role', filterTenantsByRole, async (req, res) => {
-  const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
+  const effectiveRole = req.userRole === 'admin' ? 'global_admin': req.userRole;
   const { id } = req.params;
   const { role } = req.body;
   
   // Only global_admin and client_admin can change roles
-  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin') {
+  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin' && effectiveRole !== 'msp_admin') {
     return res.status(403).json({ error: 'Access denied' });
   }
   
