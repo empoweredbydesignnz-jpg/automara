@@ -171,7 +171,12 @@ app.get('/api/tenants', filterTenantsByRole, async (req, res) => {
 
     if (effectiveRole === 'global_admin') {
       // Global admin sees ALL tenants
-      query = 'SELECT * FROM client_tenants ORDER BY parent_tenant_id NULLS FIRST, created_at DESC';
+      query = `
+  SELECT t.*, p.name AS parent_name
+  FROM client_tenants t
+  LEFT JOIN client_tenants p ON t.parent_tenant_id = p.id
+  ORDER BY t.parent_tenant_id NULLS FIRST, t.created_at DESC
+`;
       console.log('Global admin query:', query);
     } else if (effectiveRole === 'client_admin' || effectiveRole === 'msp_admin') {
       if (!req.tenantId) {

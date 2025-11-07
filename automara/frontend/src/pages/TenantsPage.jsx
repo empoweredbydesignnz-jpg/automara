@@ -219,8 +219,10 @@ function TenantsPage() {
                     {tenant.name.charAt(0)}
                   </div>
                   {tenant.parent_tenant_id && (
-                    <span className="text-xs text-blue-400">↳ Sub-tenant</span>
-                  )}
+  <span className="text-xs text-blue-400">
+    ↳ Sub-tenant of {tenant.parent_name || 'Unknown'}
+  </span>
+)}
                 </div>
                 <div className="flex flex-col items-end space-y-1">
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
