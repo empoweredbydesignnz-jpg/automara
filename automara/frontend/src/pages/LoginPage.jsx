@@ -32,7 +32,7 @@ function LoginPage({ onLogin }) {
               </svg>
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">Automara</h1>
-            <p className="text-gray-400">Multi-Tenant SaaS Platform</p>
+            <p className="text-gray-400">Multi-Tenant Automation SaaS Platform</p>
           </div>
 
           {error && (

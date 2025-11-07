@@ -8,6 +8,7 @@ function SignupPage() {
   const [formData, setFormData] = useState({
     companyName: '',
     domain: '',
+    tenantType: 'client',
     firstName: '',
     lastName: '',
     email: '',
@@ -90,6 +91,7 @@ function SignupPage() {
           owner_email: formData.email,
           owner_first_name: formData.firstName,
           owner_last_name: formData.lastName,
+          tenant_type: formData.tenantType,
         }),
       })
       
@@ -178,9 +180,29 @@ function SignupPage() {
                       className="flex-1 px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-l-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                     <span className="px-4 py-3 bg-gray-700 border border-l-0 border-gray-600 rounded-r-lg text-gray-400">.automara.com</span>
+                   </div>
                   </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Account Type
+                  </label>
+                  <select
+                    name="tenantType"
+                    value={formData.tenantType}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="client">Single Business Entity</option>
+                    <option value="msp">Managed Service Provider (MSP)</option>
+                  </select>
+                  <p className="text-gray-400 text-xs mt-1">
+                    MSPs can manage multiple client organizations
+                  </p>
                 </div>
               </div>
+
+              
             )}
 
             {step === 2 && (
