@@ -9,6 +9,7 @@ import SettingsPage from './pages/SettingsPage'
 import Layout from './components/Layout'
 import UsersPage from './pages/UsersPage'
 import SubTenantsPage from './pages/SubTenantsPage'
+import AutomationsLibrary from './pages/AutomationsLibrary'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -143,6 +144,7 @@ function App() {
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard tenant={currentTenant} />} />
                   <Route path="/tenants" element={<TenantsPage />} />
+                  <Route path="/automations" element={<AutomationsLibrary />} />
 		  <Route path="/users" element={<UsersPage />} />
       <Route path="/tenants/:parentId/sub-tenants" element={<SubTenantsPage />} />
                   <Route path="/settings" element={<SettingsPage user={user} />} />
