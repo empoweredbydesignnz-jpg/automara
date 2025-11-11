@@ -513,8 +513,21 @@ app.patch('/api/users/:id/role', filterTenantsByRole, async (req, res) => {
 // Workflows API endpoints
 app.get('/api/workflows', filterTenantsByRole, async (req, res) => {
   try {
-    // TODO: Fetch from n8n API or database
-    res.json({ workflows: [] });
+    const tenantId = req.tenantId;
+    
+    let query = 'SELECT * FROM workflows';
+    let params = [];
+    
+    // Filter by tenant unless global admin
+    if (req.userRole !== 'global_admin' && tenantId) {
+      query += ' WHERE tenant_id = $1';
+      params = [tenantId];
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const result = await pool.query(query, params);
+    res.json({ workflows: result.rows });
   } catch (error) {
     console.error('Error fetching workflows:', error);
     res.status(500).json({ error: error.message });
@@ -551,19 +564,33 @@ app.post('/api/workflows/sync', filterTenantsByRole, async (req, res) => {
     const n8nApiKey = process.env.N8N_API_KEY;
     
     if (!n8nApiKey) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'N8N API key not configured' 
-      });
+      return res.status(400).json({ success: false, error: 'N8N API key not configured' });
     }
     
+    // Fetch workflows from n8n
     const response = await axios.get(`${n8nApiUrl}/workflows`, {
-      headers: {
-        'X-N8N-API-KEY': n8nApiKey
-      }
+      headers: { 'X-N8N-API-KEY': n8nApiKey }
     });
     
     const workflows = response.data.data || [];
+    
+    // Get tenant_id - convert empty string to null for global admin
+    const tenantId = req.tenantId || null;
+    
+    console.log(`Syncing ${workflows.length} workflows for tenant ${tenantId || 'global'}`);
+    
+    // Store/update workflows in database
+    for (const wf of workflows) {
+      await pool.query(
+        `INSERT INTO workflows (n8n_workflow_id, tenant_id, name, active, n8n_data, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (n8n_workflow_id) 
+         DO UPDATE SET name = $3, active = $4, n8n_data = $5, tenant_id = $2, updated_at = NOW()`,
+        [wf.id, tenantId, wf.name, wf.active, JSON.stringify(wf)]
+      );
+    }
+    
+    console.log('Workflows synced successfully');
     
     res.json({ 
       success: true,
@@ -579,7 +606,6 @@ app.post('/api/workflows/sync', filterTenantsByRole, async (req, res) => {
     });
   }
 });
-
 app.post('/api/workflows/create', filterTenantsByRole, async (req, res) => {
   try {
     const { template_type, configuration } = req.body;
@@ -592,6 +618,36 @@ app.post('/api/workflows/create', filterTenantsByRole, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating workflow:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/workflows/:id', filterTenantsByRole, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+    
+    // Get workflow
+    let query = 'SELECT * FROM workflows WHERE id = $1';
+    let params = [id];
+    
+    if (req.userRole !== 'global_admin') {
+      query += ' AND tenant_id = $2';
+      params.push(tenantId);
+    }
+    
+    const workflow = await pool.query(query, params);
+    
+    if (workflow.rows.length === 0) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+    
+    // Delete from database
+    await pool.query('DELETE FROM workflows WHERE id = $1', [id]);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting workflow:', error);
     res.status(500).json({ error: error.message });
   }
 });
