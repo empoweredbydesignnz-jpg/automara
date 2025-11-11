@@ -255,4 +255,29 @@ const Workflows = () => {
   );
 };
 
+// Make sure this is at the END of your workflows.js file, just before module.exports
+router.post('/sync', async (req, res) => {
+    try {
+        const n8n = getN8NService();
+        const n8nWorkflows = await n8n.getAllWorkflows();
+        // ... rest of the code
+        res.json({ success: true, message: `Synced ${syncedWorkflows.length} workflows` });
+    } catch (err) {
+        console.error('Error syncing workflows:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/n8n', async (req, res) => {
+    try {
+        const n8n = getN8NService();
+        const workflows = await n8n.getAllWorkflows();
+        res.json({ workflows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+module.exports = router; // This should be the LAST line
+
 export default Workflows;

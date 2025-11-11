@@ -7,6 +7,93 @@ const { getN8NService } = require('../services/n8n');
 const { verifyResourceOwnership } = require('../middleware/tenant');
 const EncryptionService = require('../services/encryption');
 
+console.log('✅ workflows.js loaded');
+
+router.get('/test', (req, res) => {
+  res.json({ message: 'Test endpoint works!' });
+});
+
+/**
+ * @swagger
+ * /api/workflows/sync:
+ *   post:
+ *     summary: Sync existing N8N workflows into the system
+ *     tags: [Workflows]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/sync', async (req, res) => {
+    try {
+        const n8n = getN8NService();
+        
+        // Get all workflows from N8N
+        const n8nWorkflows = await n8n.getAllWorkflows();
+        
+        const syncedWorkflows = [];
+        
+        for (const n8nWorkflow of n8nWorkflows) {
+            // Check if workflow already exists in database
+            const existing = await global.db.query(
+                `SELECT id FROM ${req.schemaName}.workflows WHERE n8n_workflow_id = $1`,
+                [n8nWorkflow.id]
+            );
+            
+            if (existing.rows.length === 0) {
+                // Create workflow in database
+                const result = await global.db.query(
+                    `INSERT INTO ${req.schemaName}.workflows 
+                    (n8n_workflow_id, workflow_type, name, description, 
+                     webhook_url, is_active, configuration, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+                    RETURNING *`,
+                    [
+                        n8nWorkflow.id,
+                        n8nWorkflow.type || 'custom',
+                        n8nWorkflow.name,
+                        n8nWorkflow.description || 'Imported from N8N',
+                        n8nWorkflow.webhook_url || null,
+                        n8nWorkflow.active || false,
+                        JSON.stringify({
+                            imported: true,
+                            original_data: n8nWorkflow
+                        })
+                    ]
+                );
+                syncedWorkflows.push(result.rows[0]);
+            }
+        }
+        
+        res.json({ 
+            success: true, 
+            message: `Synced ${syncedWorkflows.length} workflows`,
+            workflows: syncedWorkflows 
+        });
+    } catch (err) {
+        console.error('Error syncing workflows:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/workflows/n8n:
+ *   get:
+ *     summary: Get all workflows directly from N8N
+ *     tags: [Workflows]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/n8n', async (req, res) => {
+    try {
+        const n8n = getN8NService();
+        const workflows = await n8n.getAllWorkflows();
+        res.json({ workflows });
+    } catch (err) {
+        console.error('Error fetching N8N workflows:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 /**
  * @swagger
  * /api/workflows/templates:
@@ -344,5 +431,6 @@ router.delete('/:id', verifyResourceOwnership('workflows'), async (req, res) => 
         res.status(500).json({ error: 'Failed to delete workflow' });
     }
 });
+
 
 module.exports = router;

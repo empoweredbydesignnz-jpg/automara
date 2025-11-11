@@ -33,6 +33,19 @@ class N8NService {
             throw new Error('Failed to connect to N8N service');
         }
     }
+
+    /** 
+    * n8n getallworkflows
+    */
+    async getAllWorkflows() {
+        try {
+        const response = await this.client.get('/api/v1/workflows');
+        return response.data.data || [];
+    } catch (err) {
+        console.error('Error fetching N8N workflows:', err.response?.data || err.message);
+        throw new Error('Failed to fetch workflows from N8N');
+    }
+}
     
     /**
      * Get all available workflow templates

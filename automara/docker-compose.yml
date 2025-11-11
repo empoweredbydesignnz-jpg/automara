@@ -7,9 +7,9 @@ services:
     container_name: automara-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-automara}
+      POSTGRES_USER: automara
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-automara}
+      POSTGRES_DB: automara
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -93,6 +93,8 @@ services:
       DB_USER: automara
       DB_PASSWORD: automara
       DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+      N8N_API_URL: ${N8N_API_URL}
+      N8N_API_KEY: ${N8N_API_KEY}
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/tenant-signup}
     ports:
       - "4000:4000"

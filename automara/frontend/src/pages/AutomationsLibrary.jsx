@@ -1,4 +1,3 @@
-// frontend/src/pages/AutomationsLibrary.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -10,30 +9,28 @@ const AutomationsLibrary = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  const getAuthHeaders = () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    return {
+      'x-user-role': user?.role || 'client_user',
+      'x-tenant-id': user?.tenantId || '',
+    };
+  };
+
   const fetchData = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      
-      // Fetch workflow templates
-      const templatesResponse = await axios.get('/api/workflows/templates', {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      });
-      
-      // Fetch active workflows
-      const workflowsResponse = await axios.get('/api/workflows', {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      });
+      const headers = getAuthHeaders();
+
+      const [templatesResponse, workflowsResponse] = await Promise.all([
+        axios.get('/api/workflows/templates', { headers }),
+        axios.get('/api/workflows', { headers }),
+      ]);
 
       setTemplates(templatesResponse.data.templates || []);
       setWorkflows(workflowsResponse.data.workflows || []);
@@ -44,19 +41,40 @@ const AutomationsLibrary = () => {
     }
   };
 
+  const handleSyncN8N = async () => {
+    setSyncing(true);
+    try {
+      const headers = getAuthHeaders();
+
+      const response = await axios.post('/api/workflows/sync', {}, { headers });
+
+      if (response.data.success) {
+        alert(`Successfully synced ${response.data.workflows.length} workflows from N8N!`);
+        fetchData();
+      } else {
+        alert('Sync completed, but no workflows were imported.');
+      }
+    } catch (error) {
+      console.error('Error syncing N8N workflows:', error);
+      alert('Failed to sync workflows: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleCreateWorkflow = async (templateType, config) => {
     setCreating(true);
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.post('/api/workflows/create', {
-        template_type: templateType,
-        configuration: config
-      }, {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      });
+      const headers = getAuthHeaders();
+
+      const response = await axios.post(
+        '/api/workflows/create',
+        {
+          template_type: templateType,
+          configuration: config,
+        },
+        { headers }
+      );
 
       if (response.data.success) {
         alert('Workflow created successfully!');
@@ -74,17 +92,14 @@ const AutomationsLibrary = () => {
 
   const handleToggleWorkflow = async (workflowId, isActive) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      await axios.patch(`/api/workflows/${workflowId}/toggle`, 
+      const headers = getAuthHeaders();
+
+      await axios.patch(
+        `/api/workflows/${workflowId}/toggle`,
         { active: !isActive },
-        {
-          headers: {
-            'x-user-role': user?.role || 'client_user',
-            'x-tenant-id': user?.tenantId || ''
-          }
-        }
+        { headers }
       );
-      
+
       fetchData();
     } catch (error) {
       console.error('Error toggling workflow:', error);
@@ -94,14 +109,10 @@ const AutomationsLibrary = () => {
 
   const handleExecuteWorkflow = async (workflowId) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      await axios.post(`/api/workflows/${workflowId}/execute`, {}, {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      });
-      
+      const headers = getAuthHeaders();
+
+      await axios.post(`/api/workflows/${workflowId}/execute`, {}, { headers });
+
       alert('Workflow execution started!');
     } catch (error) {
       console.error('Error executing workflow:', error);
@@ -156,16 +167,26 @@ const AutomationsLibrary = () => {
               <span>Automations Library</span>
             </h1>
             <p className="text-gray-400">
-              Manage your N8N workflow automations and templates
+              Manage your workflow automations and templates
             </p>
           </div>
-          <button
-            onClick={() => setActiveTab('templates')}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition flex items-center space-x-2"
-          >
-            <span className="text-lg">+</span>
-            <span>Browse Templates</span>
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={handleSyncN8N}
+              disabled={syncing}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition flex items-center space-x-2 disabled:opacity-50"
+            >
+              <span className="text-lg">🔄</span>
+              <span>{syncing ? 'Syncing...' : 'Sync N8N'}</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('templates')}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition flex items-center space-x-2"
+            >
+              <span className="text-lg">+</span>
+              <span>Browse Templates</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -174,9 +195,9 @@ const AutomationsLibrary = () => {
         <div className="border-b border-gray-700">
           <nav className="flex space-x-8">
             {[
-              { id: 'workflows', name: 'Active Workflows', count: workflows.filter(w => w.is_active).length },
+              { id: 'workflows', name: 'Active Workflows', count: workflows.filter((w) => w.is_active).length },
               { id: 'templates', name: 'Templates', count: templates.length },
-              { id: 'executions', name: 'Recent Executions', count: 0 }
+              { id: 'executions', name: 'Recent Executions', count: 0 },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -232,12 +253,16 @@ const AutomationsLibrary = () => {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="text-lg">{getStatusIcon(workflow.is_active ? 'active' : 'inactive')}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        workflow.is_active 
-                          ? 'bg-green-500 bg-opacity-10 text-green-400' 
-                          : 'bg-gray-500 bg-opacity-10 text-gray-400'
-                      }`}>
+                      <span className="text-lg">
+                        {getStatusIcon(workflow.is_active ? 'active' : 'inactive')}
+                      </span>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          workflow.is_active
+                            ? 'bg-green-500 bg-opacity-10 text-green-400'
+                            : 'bg-gray-500 bg-opacity-10 text-gray-400'
+                        }`}
+                      >
                         {workflow.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
@@ -256,7 +281,11 @@ const AutomationsLibrary = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Last execution:</span>
-                      <span>{workflow.last_execution ? new Date(workflow.last_execution).toLocaleDateString() : 'Never'}</span>
+                      <span>
+                        {workflow.last_execution
+                          ? new Date(workflow.last_execution).toLocaleDateString()
+                          : 'Never'}
+                      </span>
                     </div>
                   </div>
 
@@ -404,7 +433,9 @@ const AutomationsLibrary = () => {
                 <div key={field.name}>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     {field.label}
-                    {field.required && <span className="text-red-400 ml-1">*</span>}
+                    {field.required && (
+                      <span className="text-red-400 ml-1">*</span>
+                    )}
                   </label>
                   <input
                     type={field.type === 'password' ? 'password' : 'text'}

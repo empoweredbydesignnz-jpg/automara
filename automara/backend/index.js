@@ -328,7 +328,7 @@ app.post('/api/tenants', filterTenantsByRole, async (req, res) => {
     
     // Send to n8n webhook
     try {
-      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://n8n:5678/webhook/tenant-signup';
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://n8n.empoweredbydesign.co.nz:5678/webhook/tenant-signup';
       
       await axios.post(n8nWebhookUrl, {
         tenant: {
@@ -506,6 +506,109 @@ app.patch('/api/users/:id/role', filterTenantsByRole, async (req, res) => {
     res.json({ success: true, user: result.rows[0] });
   } catch (error) {
     console.error('Error updating user role:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Workflows API endpoints
+app.get('/api/workflows', filterTenantsByRole, async (req, res) => {
+  try {
+    // TODO: Fetch from n8n API or database
+    res.json({ workflows: [] });
+  } catch (error) {
+    console.error('Error fetching workflows:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/workflows/templates', filterTenantsByRole, async (req, res) => {
+  try {
+    res.json({ 
+      templates: [
+        {
+          id: 1,
+          name: 'Email Automation',
+          description: 'Automated email workflows',
+          category: 'Communication'
+        },
+        {
+          id: 2,
+          name: 'Data Sync',
+          description: 'Sync data between systems',
+          category: 'Integration'
+        }
+      ] 
+    });
+  } catch (error) {
+    console.error('Error fetching templates:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/workflows/sync', filterTenantsByRole, async (req, res) => {
+  try {
+    const n8nApiUrl = process.env.N8N_API_URL || 'http://n8n:5678/api/v1';
+    const n8nApiKey = process.env.N8N_API_KEY;
+    
+    if (!n8nApiKey) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'N8N API key not configured' 
+      });
+    }
+    
+    const response = await axios.get(`${n8nApiUrl}/workflows`, {
+      headers: {
+        'X-N8N-API-KEY': n8nApiKey
+      }
+    });
+    
+    const workflows = response.data.data || [];
+    
+    res.json({ 
+      success: true,
+      workflows: workflows,
+      count: workflows.length
+    });
+    
+  } catch (error) {
+    console.error('Error syncing n8n workflows:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+app.post('/api/workflows/create', filterTenantsByRole, async (req, res) => {
+  try {
+    const { template_type, configuration } = req.body;
+    
+    // TODO: Create workflow in n8n
+    
+    res.json({ 
+      success: true,
+      workflow: { id: Date.now(), name: 'New Workflow' }
+    });
+  } catch (error) {
+    console.error('Error creating workflow:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/workflows/:id/toggle', filterTenantsByRole, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { active } = req.body;
+    
+    // TODO: Toggle workflow in n8n
+    
+    res.json({ 
+      success: true,
+      workflow: { id, active }
+    });
+  } catch (error) {
+    console.error('Error toggling workflow:', error);
     res.status(500).json({ error: error.message });
   }
 });

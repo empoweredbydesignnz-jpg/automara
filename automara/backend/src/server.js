@@ -10,19 +10,20 @@ const supertokens = require('supertokens-node');
 const Session = require('supertokens-node/recipe/session');
 const EmailPassword = require('supertokens-node/recipe/emailpassword');
 const ThirdParty = require('supertokens-node/recipe/thirdparty');
-const MultiFactorAuth = require('supertokens-node/recipe/multifactorauth');
+// const MultiFactorAuth = require('supertokens-node/recipe/multifactorauth');
 const { middleware, errorHandler } = require('supertokens-node/framework/express');
 const swaggerUi = require('swagger-ui-express');
 const { Pool } = require('pg');
 const crypto = require('crypto');
 
+
 // Import routes
 const tenantRoutes = require('./routes/tenants');
 const workflowRoutes = require('./routes/workflows');
-const apiKeyRoutes = require('./routes/apiKeys');
+// const apiKeyRoutes = require('./routes/apiKeys');
 const webhookRoutes = require('./routes/webhooks');
-const stripeRoutes = require('./routes/stripe');
-const m365Routes = require('./routes/m365');
+// const stripeRoutes = require('./routes/stripe');
+// const m365Routes = require('./routes/m365');
 
 // Import middleware
 const { tenantMiddleware } = require('./middleware/tenant');
@@ -30,78 +31,66 @@ const { auditLogger } = require('./middleware/audit');
 
 // Import services
 const { initializeN8N } = require('./services/n8n');
-const swaggerSpec = require('./config/swagger');
+// const swaggerSpec = require('./config/swagger');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Database connection pool
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    host: process.env.DB_HOST || 'postgres',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'automara',
+    user: process.env.DB_USER || 'automara',
+    password: process.env.DB_PASSWORD,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
-});
+}); 
 
 // Make pool available globally
 global.db = pool;
 
-// Initialize SuperTokens
-supertokens.init({
-    framework: 'express',
-    supertokens: {
-        connectionURI: process.env.SUPERTOKENS_CONNECTION_URI,
-        apiKey: process.env.SUPERTOKENS_API_KEY,
-    },
-    appInfo: {
-        appName: 'Automara',
-        apiDomain: process.env.API_DOMAIN,
-        websiteDomain: process.env.FRONTEND_URL,
-        apiBasePath: '/auth',
-        websiteBasePath: '/auth',
-    },
-    recipeList: [
-        EmailPassword.init({
-            signUpFeature: {
-                formFields: [
-                    { id: 'email' },
-                    { id: 'password' },
-                    { id: 'tenantId', optional: true },
-                ],
-            },
-        }),
-        ThirdParty.init({
-            signInAndUpFeature: {
-                providers: [
-                    // Can add Google, Microsoft SSO later
-                ],
-            },
-        }),
-        MultiFactorAuth.init({
-            firstFactors: ['emailpassword'],
-        }),
-        Session.init({
-            jwt: {
-                enable: true,
-            },
-            override: {
-                functions: (originalImplementation) => ({
-                    ...originalImplementation,
-                    createNewSession: async function (input) {
-                        // Add tenant_id to JWT payload
-                        const tenantId = input.userContext?.tenantId;
-                        input.accessTokenPayload = {
-                            ...input.accessTokenPayload,
-                            tenantId,
-                        };
-                        return originalImplementation.createNewSession(input);
-                    },
-                }),
-            },
-        }),
-    ],
-});
+recipeList: [
+    EmailPassword.init({
+        signUpFeature: {
+            formFields: [
+                { id: 'email' },
+                { id: 'password' },
+                { id: 'tenantId', optional: true },
+            ],
+        },
+    }),
+    ThirdParty.init({
+        signInAndUpFeature: {
+            providers: [
+                // add providers later
+            ],
+        },
+    }),
+    // MultiFactorAuth.init({
+    //     firstFactors: ['emailpassword'],
+    // }),
+    Session.init({
+        jwt: {
+            enable: true,
+        },
+        override: {
+            functions: (originalImplementation) => ({
+                ...originalImplementation,
+                createNewSession: async function (input) {
+                    const tenantId = input.userContext?.tenantId;
+                    input.accessTokenPayload = {
+                        ...input.accessTokenPayload,
+                        tenantId,
+                    };
+                    return originalImplementation.createNewSession(input);
+                },
+            }),
+        },
+    }),
+],
 
 // Security middleware
 app.use(helmet({
@@ -160,17 +149,23 @@ app.get('/health', (req, res) => {
 });
 
 // API Documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Automara API Documentation',
-}));
+// app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+//    customCss: '.swagger-ui .topbar { display: none }',
+//    customSiteTitle: 'Automara API Documentation',
+//}));
 
-// Routes with tenant middleware
+// DEBUG ONLY
+app.get('/debug/workflows-test', (req, res) => {
+    res.json({ ok: true, ts: Date.now() });
+});
+
+// Routes
 app.use('/api/tenants', tenantRoutes);
-app.use('/api/workflows', tenantMiddleware, auditLogger, workflowRoutes);
-app.use('/api/keys', tenantMiddleware, auditLogger, apiKeyRoutes);
-app.use('/api/m365', tenantMiddleware, auditLogger, m365Routes);
-app.use('/api/stripe', stripeRoutes);
+app.use('/api/workflows', workflowRoutes);
+// app.use('/api/keys', tenantMiddleware, auditLogger, apiKeyRoutes);
+// If you add these files later, you can re-enable:
+// app.use('/api/m365', tenantMiddleware, auditLogger, m365Routes);
+// app.use('/api/stripe', stripeRoutes);
 
 // Webhook routes (no auth required, but signature verification)
 app.use('/webhooks', webhookRoutes);
@@ -194,11 +189,6 @@ app.use((err, req, res, next) => {
             ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
         },
     });
-});
-
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
 });
 
 // Graceful shutdown
