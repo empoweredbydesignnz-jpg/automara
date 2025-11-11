@@ -572,12 +572,22 @@ app.post('/api/workflows/sync', filterTenantsByRole, async (req, res) => {
       headers: { 'X-N8N-API-KEY': n8nApiKey }
     });
     
-    const workflows = response.data.data || [];
+    const allWorkflows = response.data.data || [];
     
-    // Get tenant_id - convert empty string to null for global admin
+    // Filter workflows - only those with "library" tag
+    const workflows = allWorkflows.filter(wf => {
+      // Check if workflow has tags array
+      if (!Array.isArray(wf.tags)) return false;
+      
+      // Check if any tag contains "library" (case insensitive)
+      return wf.tags.some(tag => 
+        tag.name && tag.name.toLowerCase().includes('library')
+      );
+    });
+    
+    console.log(`Found ${allWorkflows.length} total workflows, ${workflows.length} in library folder`);
+    
     const tenantId = req.tenantId || null;
-    
-    console.log(`Syncing ${workflows.length} workflows for tenant ${tenantId || 'global'}`);
     
     // Store/update workflows in database
     for (const wf of workflows) {
@@ -590,12 +600,13 @@ app.post('/api/workflows/sync', filterTenantsByRole, async (req, res) => {
       );
     }
     
-    console.log('Workflows synced successfully');
+    console.log(`Synced ${workflows.length} library workflows successfully`);
     
     res.json({ 
       success: true,
       workflows: workflows,
-      count: workflows.length
+      count: workflows.length,
+      totalInN8n: allWorkflows.length
     });
     
   } catch (error) {

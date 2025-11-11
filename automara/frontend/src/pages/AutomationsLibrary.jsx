@@ -10,8 +10,11 @@ const AutomationsLibrary = () => {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [creating, setCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    setUser(storedUser);
     fetchData();
   }, []);
 
@@ -103,136 +106,111 @@ const AutomationsLibrary = () => {
       fetchData();
     } catch (error) {
       console.error('Error toggling workflow:', error);
-      alert('Failed to update workflow');
+      alert('Failed to toggle workflow status');
     }
   };
 
-  const handleExecuteWorkflow = async (workflowId) => {
+  const handleDeleteWorkflow = async (workflowId) => {
+    if (!confirm('Are you sure you want to delete this workflow? This action cannot be undone.')) {
+      return;
+    }
+
     try {
       const headers = getAuthHeaders();
-
-      await axios.post(`/api/workflows/${workflowId}/execute`, {}, { headers });
-
-      alert('Workflow execution started!');
+      
+      await axios.delete(`/api/workflows/${workflowId}`, { headers });
+      
+      alert('Workflow deleted successfully!');
+      fetchData();
     } catch (error) {
-      console.error('Error executing workflow:', error);
-      alert('Failed to execute workflow');
+      console.error('Error deleting workflow:', error);
+      alert('Failed to delete workflow: ' + (error.response?.data?.error || error.message));
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'active':
-        return '✅';
-      case 'inactive':
-        return '⏸️';
-      case 'error':
-        return '❌';
-      default:
-        return '⏳';
-    }
-  };
-
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'm365':
-        return '🌐';
-      case 'security':
-        return '🔒';
-      case 'productivity':
-        return '⚡';
-      case 'integrations':
-        return '🔗';
-      default:
-        return '⚙️';
-    }
+  const isAdmin = () => {
+    return user?.role === 'global_admin' || user?.role === 'client_admin' || user?.role === 'msp_admin';
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
+    <div className="min-h-screen bg-gray-900 text-white p-8">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2 flex items-center space-x-3">
-              <span className="text-2xl">⚡</span>
-              <span>Automations Library</span>
-            </h1>
-            <p className="text-gray-400">
-              Manage your workflow automations and templates
-            </p>
-          </div>
-          <div className="flex space-x-3">
-            <button
-              onClick={handleSyncN8N}
-              disabled={syncing}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition flex items-center space-x-2 disabled:opacity-50"
-            >
-              <span className="text-lg">🔄</span>
-              <span>{syncing ? 'Syncing...' : 'Sync N8N'}</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('templates')}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition flex items-center space-x-2"
-            >
-              <span className="text-lg">+</span>
-              <span>Browse Templates</span>
-            </button>
-          </div>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-4xl font-bold mb-2">Automations Library</h1>
+          <p className="text-gray-400">Manage your n8n workflows and templates</p>
         </div>
+        <button
+          onClick={handleSyncN8N}
+          disabled={syncing}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition disabled:opacity-50 flex items-center space-x-2"
+        >
+          {syncing ? (
+            <>
+              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Syncing...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Sync n8n</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Tabs */}
-      <div className="mb-8">
-        <div className="border-b border-gray-700">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'workflows', name: 'Active Workflows', count: workflows.filter((w) => w.is_active).length },
-              { id: 'templates', name: 'Templates', count: templates.length },
-              { id: 'executions', name: 'Recent Executions', count: 0 },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {tab.name}
-                {tab.count > 0 && (
-                  <span className="ml-2 bg-gray-700 text-gray-300 rounded-full px-2 py-1 text-xs">
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </div>
+      <div className="flex space-x-4 mb-8 border-b border-gray-700">
+        <button
+          onClick={() => setActiveTab('workflows')}
+          className={`pb-4 px-2 font-semibold transition ${
+            activeTab === 'workflows'
+              ? 'border-b-2 border-purple-500 text-purple-400'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          My Workflows ({workflows.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('templates')}
+          className={`pb-4 px-2 font-semibold transition ${
+            activeTab === 'templates'
+              ? 'border-b-2 border-purple-500 text-purple-400'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Templates ({templates.length})
+        </button>
       </div>
 
-      {/* Active Workflows Tab */}
+      {/* Workflows Tab */}
       {activeTab === 'workflows' && (
-        <div className="space-y-6">
+        <div>
           {workflows.length === 0 ? (
-            <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
-              <div className="text-6xl mb-4">⚡</div>
-              <h3 className="text-xl font-semibold text-white mb-2">No workflows yet</h3>
-              <p className="text-gray-400 mb-6">Get started by creating your first automation</p>
+            <div className="text-center py-16 bg-gray-800 rounded-xl border border-gray-700">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <h3 className="text-xl font-semibold mb-2">No workflows yet</h3>
+              <p className="text-gray-400 mb-6">Sync your n8n workflows to get started</p>
               <button
-                onClick={() => setActiveTab('templates')}
+                onClick={handleSyncN8N}
                 className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded-lg transition"
               >
-                Browse Templates
+                Sync n8n Workflows
               </button>
             </div>
           ) : (
@@ -243,72 +221,50 @@ const AutomationsLibrary = () => {
                   className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white text-xl">
-                        ⚡
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold mb-2">{workflow.name}</h3>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          workflow.active
+                            ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500'
+                            : 'bg-gray-500 bg-opacity-10 text-gray-400 border border-gray-500'
+                        }`}>
+                          {workflow.active ? 'Active' : 'Inactive'}
+                        </span>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">{workflow.name}</h3>
-                        <p className="text-sm text-gray-400">{workflow.workflow_type}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-lg">
-                        {getStatusIcon(workflow.is_active ? 'active' : 'inactive')}
-                      </span>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          workflow.is_active
-                            ? 'bg-green-500 bg-opacity-10 text-green-400'
-                            : 'bg-gray-500 bg-opacity-10 text-gray-400'
-                        }`}
-                      >
-                        {workflow.is_active ? 'Active' : 'Inactive'}
-                      </span>
                     </div>
                   </div>
 
-                  <p className="text-sm text-gray-300 mb-4 line-clamp-2">
-                    {workflow.description || 'No description available'}
-                  </p>
-
-                  <div className="space-y-2 mb-4 text-sm text-gray-400">
-                    <div className="flex items-center justify-between">
-                      <span>Webhook URL:</span>
-                      <code className="text-xs bg-gray-900 px-2 py-1 rounded text-purple-400">
-                        {workflow.webhook_url?.split('/').pop() || 'N/A'}
-                      </code>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Last execution:</span>
-                      <span>
-                        {workflow.last_execution
-                          ? new Date(workflow.last_execution).toLocaleDateString()
-                          : 'Never'}
-                      </span>
-                    </div>
+                  <div className="text-sm text-gray-400 mb-4">
+                    <p>Created: {new Date(workflow.created_at).toLocaleDateString()}</p>
+                    {workflow.updated_at && (
+                      <p>Updated: {new Date(workflow.updated_at).toLocaleDateString()}</p>
+                    )}
                   </div>
 
-                  <div className="flex space-x-2">
+                  <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleToggleWorkflow(workflow.n8n_workflow_id, workflow.is_active)}
-                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition ${
-                        workflow.is_active
-                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                      onClick={() => handleToggleWorkflow(workflow.id, workflow.active)}
+                      className={`flex-1 px-4 py-2 rounded-lg transition font-medium ${
+                        workflow.active
+                          ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                           : 'bg-green-600 hover:bg-green-700 text-white'
                       }`}
                     >
-                      {workflow.is_active ? '⏸ Stop' : '▶ Start'}
+                      {workflow.active ? 'Deactivate' : 'Activate'}
                     </button>
-                    <button
-                      onClick={() => handleExecuteWorkflow(workflow.n8n_workflow_id)}
-                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition"
-                    >
-                      🚀 Run Now
-                    </button>
-                    <button className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition">
-                      <span className="text-lg">⚙️</span>
-                    </button>
+
+                    {isAdmin() && (
+                      <button
+                        onClick={() => handleDeleteWorkflow(workflow.id)}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium"
+                        title="Delete workflow"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -319,158 +275,70 @@ const AutomationsLibrary = () => {
 
       {/* Templates Tab */}
       {activeTab === 'templates' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((template) => (
-              <div
-                key={template.type}
-                className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition group"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white text-xl">
-                      {getCategoryIcon(template.category)}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">{template.name}</h3>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-400">🏷️ {template.category}</span>
-                      </div>
-                    </div>
+        <div>
+          {templates.length === 0 ? (
+            <div className="text-center py-16 bg-gray-800 rounded-xl border border-gray-700">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="text-xl font-semibold mb-2">No templates available</h3>
+              <p className="text-gray-400">Check back later for workflow templates</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition cursor-pointer"
+                  onClick={() => {
+                    setSelectedTemplate(template);
+                    setShowCreateModal(true);
+                  }}
+                >
+                  <div className="mb-4">
+                    <span className="px-3 py-1 bg-purple-500 bg-opacity-10 text-purple-400 text-xs font-semibold rounded-full border border-purple-500">
+                      {template.category}
+                    </span>
                   </div>
-                </div>
-
-                <p className="text-sm text-gray-300 mb-4 line-clamp-3">
-                  {template.description}
-                </p>
-
-                <div className="space-y-2 mb-4">
-                  {template.config_fields?.slice(0, 3).map((field) => (
-                    <div key={field.name} className="flex items-center space-x-2 text-xs">
-                      <span className="text-gray-400">• {field.label}</span>
-                      {field.required && <span className="text-red-400">*</span>}
-                    </div>
-                  ))}
-                  {template.config_fields?.length > 3 && (
-                    <div className="text-xs text-gray-400">
-                      +{template.config_fields.length - 3} more fields
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => {
-                      setSelectedTemplate(template);
-                      setShowCreateModal(true);
-                    }}
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition"
-                  >
-                    🚀 Use Template
+                  <h3 className="text-xl font-bold mb-2">{template.name}</h3>
+                  <p className="text-gray-400 text-sm mb-4">{template.description}</p>
+                  <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition font-medium">
+                    Use Template
                   </button>
-                  <button className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition">
-                    <span className="text-lg">📋</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Executions Tab */}
-      {activeTab === 'executions' && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700">
-          <div className="p-6 border-b border-gray-700">
-            <h2 className="text-xl font-bold text-white">📊 Recent Workflow Executions</h2>
-          </div>
-          <div className="p-6">
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-6xl mb-4">⏳</div>
-              <p>Execution history will appear here</p>
-              <p className="text-sm">Run a workflow to see execution details</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Workflow Modal */}
-      {showCreateModal && selectedTemplate && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl p-8 max-w-2xl w-full border border-gray-700 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">Create Workflow</h2>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <span className="text-2xl">✖</span>
-              </button>
-            </div>
-
-            <div className="mb-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white text-xl">
-                  {getCategoryIcon(selectedTemplate.category)}
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white">{selectedTemplate.name}</h3>
-                  <p className="text-gray-400">{selectedTemplate.description}</p>
-                </div>
-              </div>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                const config = Object.fromEntries(formData);
-                handleCreateWorkflow(selectedTemplate.type, config);
-              }}
-              className="space-y-4"
-            >
-              {selectedTemplate.config_fields?.map((field) => (
-                <div key={field.name}>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    {field.label}
-                    {field.required && (
-                      <span className="text-red-400 ml-1">*</span>
-                    )}
-                  </label>
-                  <input
-                    type={field.type === 'password' ? 'password' : 'text'}
-                    name={field.name}
-                    required={field.required}
-                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                  />
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
 
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 px-4 rounded-lg transition font-medium disabled:opacity-50 flex items-center justify-center space-x-2"
-                >
-                  {creating ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    <span>Create Workflow</span>
-                  )}
-                </button>
-              </div>
-            </form>
+      {/* Create from Template Modal */}
+      {showCreateModal && selectedTemplate && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl p-8 max-w-md w-full border border-gray-700">
+            <h2 className="text-2xl font-bold mb-4">Create from Template</h2>
+            <p className="text-gray-400 mb-6">
+              Creating workflow from: <strong>{selectedTemplate.name}</strong>
+            </p>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setSelectedTemplate(null);
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleCreateWorkflow(selectedTemplate.id, {})}
+                disabled={creating}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition font-medium disabled:opacity-50"
+              >
+                {creating ? 'Creating...' : 'Create'}
+              </button>
+            </div>
           </div>
         </div>
       )}
