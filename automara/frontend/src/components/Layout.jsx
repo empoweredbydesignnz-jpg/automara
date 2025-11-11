@@ -11,8 +11,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
 
   const navigation = [
   { name: 'Dashboard', path: '/dashboard', icon: '📊' },
-  ...(user?.role === 'global_admin' || user?.role === 'admin' ? [{ name: 'Tenants', path: '/tenants', icon: '🏢' }] : []),
-  ...(user?.role === 'global_admin' || user?.role === 'client_admin' ? [{ name: 'Users', path: '/users', icon: '👥' }] : []),
+...(user?.role === 'global_admin' || user?.role === 'admin' || user?.role === 'client_admin' || user?.role === 'msp_admin' ? [{ name: 'Tenants', path: '/tenants', icon: '🏢' }] : []),  ...(user?.role === 'global_admin' || user?.role === 'client_admin' ? [{ name: 'Users', path: '/users', icon: '👥' }] : []),
   { name: 'Automations', path: '/automations', icon: '⚡' }, // Add this line
   { name: 'Settings', path: '/settings', icon: '⚙️' },
 ];

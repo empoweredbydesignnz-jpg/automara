@@ -20,37 +20,38 @@ function SubTenantsPage() {
   }, [parentId])
 
   const fetchData = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'))
-      
-      // Fetch all tenants
-      const response = await axios.get('/api/tenants', {
-        headers: {
-          'x-user-role': user?.role || 'client_user',
-          'x-tenant-id': user?.tenantId || ''
-        }
-      })
-      
-      const tenants = response.data.tenants || []
-      console.log('All tenants:', tenants)
-      
-      // Find parent tenant
-      const parent = tenants.find(t => t.id == parentId)
-      console.log('Parent tenant:', parent)
-      setParentTenant(parent)
-      
-      // Filter sub-tenants
-      const subs = tenants.filter(t => t.parent_tenant_id == parentId)
-      console.log('Sub-tenants for parent', parentId, ':', subs)
-      setSubTenants(subs)
-      
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      alert('Failed to load sub-tenants: ' + error.message)
-    } finally {
-      setLoading(false)
-    }
+  try {
+    const user = JSON.parse(localStorage.getItem('user'))
+    
+    // Fetch all tenants
+    const response = await axios.get('/api/tenants', {
+      headers: {
+        'x-user-role': user?.role || 'client_user',
+        'x-tenant-id': user?.tenantId || ''
+      }
+    })
+    
+    const tenants = response.data.tenants || []
+    console.log('All tenants:', tenants)
+    console.log('Looking for parent ID:', parentId)
+    
+    // Find parent tenant - try both string and number comparison
+    const parent = tenants.find(t => t.id == parentId || t.id === parseInt(parentId))
+    console.log('Parent tenant found:', parent)
+    setParentTenant(parent)
+    
+    // Filter sub-tenants
+    const subs = tenants.filter(t => t.parent_tenant_id == parentId || t.parent_tenant_id === parseInt(parentId))
+    console.log('Sub-tenants for parent', parentId, ':', subs)
+    setSubTenants(subs)
+    
+  } catch (error) {
+    console.error('Error fetching data:', error)
+    alert('Failed to load sub-tenants: ' + error.message)
+  } finally {
+    setLoading(false)
   }
+}
 
   const handleAddSubTenant = async (e) => {
     e.preventDefault()
