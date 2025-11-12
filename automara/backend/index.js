@@ -584,6 +584,26 @@ app.post('/api/workflows/sync', filterTenantsByRole, async (req, res) => {
         tag.name && tag.name.toLowerCase().includes('library')
       );
     });
+
+    app.get('/api/workflows/:id/details', filterTenantsByRole, async (req, res) => {
+  try {
+    const { id } = req.params;
+    let query = 'SELECT * FROM workflows WHERE id = $1';
+    let params = [id];
+    
+    if (req.userRole !== 'global_admin' && req.tenantId) {
+      query += ' AND tenant_id = $2';
+      params.push(req.tenantId || null);
+    }
+    
+    const result = await pool.query(query, params);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    
+    res.json({ workflow: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
     
     console.log(`Found ${allWorkflows.length} total workflows, ${workflows.length} in library folder`);
     

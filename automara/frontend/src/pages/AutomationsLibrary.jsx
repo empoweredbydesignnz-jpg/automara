@@ -11,6 +11,9 @@ const AutomationsLibrary = () => {
   const [creating, setCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [user, setUser] = useState(null);
+  const [selectedWorkflow, setSelectedWorkflow] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user'));
@@ -24,6 +27,26 @@ const AutomationsLibrary = () => {
       'x-user-role': user?.role || 'client_user',
       'x-tenant-id': user?.tenantId || '',
     };
+  };
+
+  const handleViewDetails = async (workflow) => {
+    setSelectedWorkflow(workflow);
+    setShowDetailModal(true);
+    setLoadingDetails(true);
+    
+    try {
+      const headers = getAuthHeaders();
+      const response = await axios.get(`/api/workflows/${workflow.id}/details`, { headers });
+      
+      setSelectedWorkflow({
+        ...workflow,
+        fullData: response.data.workflow
+      });
+    } catch (error) {
+      console.error('Error fetching workflow details:', error);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const fetchData = async () => {
@@ -142,7 +165,6 @@ const AutomationsLibrary = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-4xl font-bold mb-2">Automations Library</h1>
@@ -172,7 +194,6 @@ const AutomationsLibrary = () => {
         </button>
       </div>
 
-      {/* Tabs */}
       <div className="flex space-x-4 mb-8 border-b border-gray-700">
         <button
           onClick={() => setActiveTab('workflows')}
@@ -196,7 +217,6 @@ const AutomationsLibrary = () => {
         </button>
       </div>
 
-      {/* Workflows Tab */}
       {activeTab === 'workflows' && (
         <div>
           {workflows.length === 0 ? (
@@ -206,60 +226,48 @@ const AutomationsLibrary = () => {
               </svg>
               <h3 className="text-xl font-semibold mb-2">No workflows yet</h3>
               <p className="text-gray-400 mb-6">Sync your n8n workflows to get started</p>
-              <button
-                onClick={handleSyncN8N}
-                className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded-lg transition"
-              >
+              <button onClick={handleSyncN8N} className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded-lg transition">
                 Sync n8n Workflows
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {workflows.map((workflow) => (
-                <div
-                  key={workflow.id}
-                  className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition"
-                >
+                <div key={workflow.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <h3 className="text-xl font-bold mb-2">{workflow.name}</h3>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          workflow.active
-                            ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500'
-                            : 'bg-gray-500 bg-opacity-10 text-gray-400 border border-gray-500'
-                        }`}>
-                          {workflow.active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        workflow.active ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500' : 'bg-gray-500 bg-opacity-10 text-gray-400 border border-gray-500'
+                      }`}>
+                        {workflow.active ? 'Active' : 'Inactive'}
+                      </span>
                     </div>
                   </div>
 
                   <div className="text-sm text-gray-400 mb-4">
                     <p>Created: {new Date(workflow.created_at).toLocaleDateString()}</p>
-                    {workflow.updated_at && (
-                      <p>Updated: {new Date(workflow.updated_at).toLocaleDateString()}</p>
-                    )}
+                    {workflow.updated_at && <p>Updated: {new Date(workflow.updated_at).toLocaleDateString()}</p>}
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleToggleWorkflow(workflow.id, workflow.active)}
-                      className={`flex-1 px-4 py-2 rounded-lg transition font-medium ${
-                        workflow.active
-                          ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                          : 'bg-green-600 hover:bg-green-700 text-white'
+                      className={`flex-1 px-4 py-2 rounded-lg transition font-medium text-white ${
+                        workflow.active ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
                       {workflow.active ? 'Deactivate' : 'Activate'}
                     </button>
 
+                    <button onClick={() => handleViewDetails(workflow)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium" title="View details">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+
                     {isAdmin() && (
-                      <button
-                        onClick={() => handleDeleteWorkflow(workflow.id)}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium"
-                        title="Delete workflow"
-                      >
+                      <button onClick={() => handleDeleteWorkflow(workflow.id)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium" title="Delete workflow">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
@@ -273,7 +281,6 @@ const AutomationsLibrary = () => {
         </div>
       )}
 
-      {/* Templates Tab */}
       {activeTab === 'templates' && (
         <div>
           {templates.length === 0 ? (
@@ -287,24 +294,13 @@ const AutomationsLibrary = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition cursor-pointer"
-                  onClick={() => {
-                    setSelectedTemplate(template);
-                    setShowCreateModal(true);
-                  }}
-                >
+                <div key={template.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition cursor-pointer" onClick={() => { setSelectedTemplate(template); setShowCreateModal(true); }}>
                   <div className="mb-4">
-                    <span className="px-3 py-1 bg-purple-500 bg-opacity-10 text-purple-400 text-xs font-semibold rounded-full border border-purple-500">
-                      {template.category}
-                    </span>
+                    <span className="px-3 py-1 bg-purple-500 bg-opacity-10 text-purple-400 text-xs font-semibold rounded-full border border-purple-500">{template.category}</span>
                   </div>
                   <h3 className="text-xl font-bold mb-2">{template.name}</h3>
                   <p className="text-gray-400 text-sm mb-4">{template.description}</p>
-                  <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition font-medium">
-                    Use Template
-                  </button>
+                  <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition font-medium">Use Template</button>
                 </div>
               ))}
             </div>
@@ -312,33 +308,63 @@ const AutomationsLibrary = () => {
         </div>
       )}
 
-      {/* Create from Template Modal */}
       {showCreateModal && selectedTemplate && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-xl p-8 max-w-md w-full border border-gray-700">
             <h2 className="text-2xl font-bold mb-4">Create from Template</h2>
-            <p className="text-gray-400 mb-6">
-              Creating workflow from: <strong>{selectedTemplate.name}</strong>
-            </p>
-            
+            <p className="text-gray-400 mb-6">Creating workflow from: <strong>{selectedTemplate.name}</strong></p>
             <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setSelectedTemplate(null);
-                }}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleCreateWorkflow(selectedTemplate.id, {})}
-                disabled={creating}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition font-medium disabled:opacity-50"
-              >
-                {creating ? 'Creating...' : 'Create'}
+              <button onClick={() => { setShowCreateModal(false); setSelectedTemplate(null); }} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition font-medium">Cancel</button>
+              <button onClick={() => handleCreateWorkflow(selectedTemplate.id, {})} disabled={creating} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition font-medium disabled:opacity-50">{creating ? 'Creating...' : 'Create'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDetailModal && selectedWorkflow && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-gray-800 rounded-xl p-8 max-w-4xl w-full border border-gray-700 my-8">
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-3xl font-bold">{selectedWorkflow.name}</h2>
+              <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
+
+            {loadingDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-gray-900 rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4">Information</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-gray-400">Created:</span><p className="text-white">{new Date(selectedWorkflow.created_at).toLocaleString()}</p></div>
+                    <div><span className="text-gray-400">Updated:</span><p className="text-white">{new Date(selectedWorkflow.updated_at).toLocaleString()}</p></div>
+                    <div><span className="text-gray-400">Status:</span><p className="text-white">{selectedWorkflow.active ? 'Active' : 'Inactive'}</p></div>
+                  </div>
+                </div>
+
+                {selectedWorkflow.n8n_data?.nodes && (
+                  <div className="bg-gray-900 rounded-lg p-6">
+                    <h3 className="text-xl font-semibold mb-4">Nodes ({selectedWorkflow.n8n_data.nodes.length})</h3>
+                    <div className="space-y-2">
+                      {selectedWorkflow.n8n_data.nodes.map((node, i) => (
+                        <div key={i} className="bg-gray-800 p-3 rounded-lg">
+                          <p className="text-white font-medium">{node.name}</p>
+                          <p className="text-gray-400 text-xs">{node.type}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button onClick={() => setShowDetailModal(false)} className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition">Close</button>
+              </div>
+            )}
           </div>
         </div>
       )}
