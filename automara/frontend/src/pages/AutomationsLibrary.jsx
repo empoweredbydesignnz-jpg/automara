@@ -5,7 +5,7 @@ const AutomationsLibrary = () => {
   const [workflows, setWorkflows] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('workflows');
+  const [activeTab, setActiveTab] = useState('library');  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -28,6 +28,26 @@ const AutomationsLibrary = () => {
       'x-tenant-id': user?.tenantId || '',
     };
   };
+
+  const getFirstNodeNotes = (workflow) => {
+  try {
+    // Check n8n_data first (already parsed)
+    if (workflow.n8n_data?.nodes && workflow.n8n_data.nodes.length > 0) {
+      return workflow.n8n_data.nodes[0].notes || 'No notes available';
+    }
+    
+    // Fallback to workflowData if it exists
+    if (workflow.workflowData) {
+      const workflowData = JSON.parse(workflow.workflowData);
+      if (workflowData.nodes && workflowData.nodes.length > 0) {
+        return workflowData.nodes[0].notes || 'No notes available';
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing workflow:', error);
+  }
+  return 'No notes available';
+};
 
   const handleViewDetails = async (workflow) => {
     setSelectedWorkflow(workflow);
@@ -203,23 +223,23 @@ const AutomationsLibrary = () => {
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          My Workflows ({workflows.length})
+          My Workflows ({workflows.filter(w => w.active).length})
         </button>
         <button
-          onClick={() => setActiveTab('templates')}
-          className={`pb-4 px-2 font-semibold transition ${
-            activeTab === 'templates'
+onClick={() => setActiveTab('library')}          
+className={`pb-4 px-2 font-semibold transition ${
+activeTab === 'library'
               ? 'border-b-2 border-purple-500 text-purple-400'
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          Templates ({templates.length})
+          Library ({workflows.length})
         </button>
       </div>
 
       {activeTab === 'workflows' && (
         <div>
-          {workflows.length === 0 ? (
+          {workflows.filter(w => w.active).length === 0 ? (
             <div className="text-center py-16 bg-gray-800 rounded-xl border border-gray-700">
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -232,7 +252,7 @@ const AutomationsLibrary = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {workflows.map((workflow) => (
+              {workflows.filter(w => w.active).map((workflow) => (
                 <div key={workflow.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
@@ -281,28 +301,65 @@ const AutomationsLibrary = () => {
         </div>
       )}
 
-      {activeTab === 'templates' && (
+      {activeTab === 'library' && (
         <div>
-          {templates.length === 0 ? (
-            <div className="text-center py-16 bg-gray-800 rounded-xl border border-gray-700">
-              <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <h3 className="text-xl font-semibold mb-2">No templates available</h3>
-              <p className="text-gray-400">Check back later for workflow templates</p>
-            </div>
+          {workflows.length === 0 ? (
+  <div className="text-center py-16 bg-gray-800 rounded-xl border border-gray-700">
+    <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+    <h3 className="text-xl font-semibold mb-2">No workflows yet</h3>
+    <p className="text-gray-400 mb-6">Sync your n8n workflows to get started</p>
+    <button onClick={handleSyncN8N} className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded-lg transition">
+      Sync n8n Workflows
+    </button>
+  </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {templates.map((template) => (
-                <div key={template.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition cursor-pointer" onClick={() => { setSelectedTemplate(template); setShowCreateModal(true); }}>
-                  <div className="mb-4">
-                    <span className="px-3 py-1 bg-purple-500 bg-opacity-10 text-purple-400 text-xs font-semibold rounded-full border border-purple-500">{template.category}</span>
+              {workflows.map((workflow) => (
+                <div key={workflow.id} className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold mb-2">{workflow.name}</h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        workflow.active ? 'bg-green-500 bg-opacity-10 text-green-400 border border-green-500' : 'bg-gray-500 bg-opacity-10 text-gray-400 border border-gray-500'
+                      }`}>
+                        {workflow.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">{template.name}</h3>
-                  <p className="text-gray-400 text-sm mb-4">{template.description}</p>
-                  <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition font-medium">Use Template</button>
+
+                  <div className="text-sm text-gray-400 mb-4">
+                    <p>Created: {new Date(workflow.created_at).toLocaleDateString()}</p>
+                    {workflow.updated_at && <p>Updated: {new Date(workflow.updated_at).toLocaleDateString()}</p>}
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleToggleWorkflow(workflow.id, workflow.active)}
+                      className={`flex-1 px-4 py-2 rounded-lg transition font-medium text-white ${
+                        workflow.active ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                    >
+                      {workflow.active ? 'Deactivate' : 'Activate'}
+                    </button>
+
+                    <button onClick={() => handleViewDetails(workflow)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium" title="View details">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+
+                    {isAdmin() && (
+                      <button onClick={() => handleDeleteWorkflow(workflow.id)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium" title="Delete workflow">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))}
+))}
             </div>
           )}
         </div>
@@ -310,7 +367,7 @@ const AutomationsLibrary = () => {
 
       {showCreateModal && selectedTemplate && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl p-8 max-w-md w-full border border-gray-700">
+          <div className="bg-gray-800 rounded-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
             <h2 className="text-2xl font-bold mb-4">Create from Template</h2>
             <p className="text-gray-400 mb-6">Creating workflow from: <strong>{selectedTemplate.name}</strong></p>
             <div className="flex space-x-3">
@@ -320,7 +377,6 @@ const AutomationsLibrary = () => {
           </div>
         </div>
       )}
-
       {showDetailModal && selectedWorkflow && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-gray-800 rounded-xl p-8 max-w-4xl w-full border border-gray-700 my-8">
@@ -333,37 +389,48 @@ const AutomationsLibrary = () => {
               </button>
             </div>
 
-            {loadingDetails ? (
+  {loadingDetails ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="bg-gray-900 rounded-lg p-6">
-                  <h3 className="text-xl font-semibold mb-4">Information</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><span className="text-gray-400">Created:</span><p className="text-white">{new Date(selectedWorkflow.created_at).toLocaleString()}</p></div>
-                    <div><span className="text-gray-400">Updated:</span><p className="text-white">{new Date(selectedWorkflow.updated_at).toLocaleString()}</p></div>
-                    <div><span className="text-gray-400">Status:</span><p className="text-white">{selectedWorkflow.active ? 'Active' : 'Inactive'}</p></div>
-                  </div>
-                </div>
-
-                {selectedWorkflow.n8n_data?.nodes && (
+              <>
+                {console.log('Workflow data:', selectedWorkflow)}
+                {console.log('n8n_data:', selectedWorkflow.n8n_data)}
+                {console.log('notes:', selectedWorkflow.n8n_data?.notes)}
+                <div className="space-y-6">
                   <div className="bg-gray-900 rounded-lg p-6">
-                    <h3 className="text-xl font-semibold mb-4">Nodes ({selectedWorkflow.n8n_data.nodes.length})</h3>
-                    <div className="space-y-2">
-                      {selectedWorkflow.n8n_data.nodes.map((node, i) => (
-                        <div key={i} className="bg-gray-800 p-3 rounded-lg">
-                          <p className="text-white font-medium">{node.name}</p>
-                          <p className="text-gray-400 text-xs">{node.type}</p>
-                        </div>
-                      ))}
+                    <h3 className="text-xl font-semibold mb-4">Information</h3>
+                  {/* First Node Notes */}
+<div className="mb-4">
+<span className="text-gray-400 block mb-2">Description:</span>  <p className="text-white bg-gray-800 p-3 rounded" style={{ whiteSpace: 'pre-wrap' }}>
+    {getFirstNodeNotes(selectedWorkflow)}
+  </p>
+</div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><span className="text-gray-400">Created:</span><p className="text-white">{new Date(selectedWorkflow.created_at).toLocaleString()}</p></div>
+                      <div><span className="text-gray-400">Updated:</span><p className="text-white">{new Date(selectedWorkflow.updated_at).toLocaleString()}</p></div>
+                      <div><span className="text-gray-400">Status:</span><p className="text-white">{selectedWorkflow.active ? 'Active' : 'Inactive'}</p></div>
                     </div>
                   </div>
-                )}
 
-                <button onClick={() => setShowDetailModal(false)} className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition">Close</button>
-              </div>
+                  {selectedWorkflow.n8n_data?.nodes && (
+                    <div className="bg-gray-900 rounded-lg p-6">
+                      <h3 className="text-xl font-semibold mb-4">Nodes ({selectedWorkflow.n8n_data.nodes.length})</h3>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {selectedWorkflow.n8n_data.nodes.map((node, i) => (
+                          <div key={i} className="bg-gray-800 p-3 rounded-lg">
+                            <p className="text-white font-medium">{node.name}</p>
+                            <p className="text-gray-400 text-xs">{node.type.replace(/^n8n-nodes-/, '')}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={() => setShowDetailModal(false)} className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition">Close</button>
+                </div>
+              </>
             )}
           </div>
         </div>
