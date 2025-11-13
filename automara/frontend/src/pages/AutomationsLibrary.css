@@ -1,0 +1,9 @@
+/* AutomationsLibrary.css */
+/* Only use this if Tailwind's line-clamp utility doesn't work */
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

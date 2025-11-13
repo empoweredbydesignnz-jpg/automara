@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const axios = require('axios');
+const workflowActivationRoutes = require('./routes/workflow-activation');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -699,6 +700,7 @@ app.patch('/api/workflows/:id/toggle', filterTenantsByRole, async (req, res) => 
   }
 });
 
+app.use('/api', workflowActivationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
