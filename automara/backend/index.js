@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const axios = require('axios');
-
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -699,6 +698,7 @@ app.patch('/api/workflows/:id/toggle', filterTenantsByRole, async (req, res) => 
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

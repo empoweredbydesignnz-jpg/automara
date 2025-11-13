@@ -2,6 +2,8 @@
 // Main Express server with comprehensive multi-tenant architecture
 
 const express = require('express');
+const app = express();
+const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -15,6 +17,9 @@ const { middleware, errorHandler } = require('supertokens-node/framework/express
 const swaggerUi = require('swagger-ui-express');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+
+// ... other requires ...
+const workflowActivationRoutes = require('./routes/workflow-activation');
 
 
 // Import routes
@@ -162,6 +167,7 @@ app.get('/debug/workflows-test', (req, res) => {
 // Routes
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/workflows', workflowRoutes);
+app.use('/api', workflowActivationRoutes);
 // app.use('/api/keys', tenantMiddleware, auditLogger, apiKeyRoutes);
 // If you add these files later, you can re-enable:
 // app.use('/api/m365', tenantMiddleware, auditLogger, m365Routes);
