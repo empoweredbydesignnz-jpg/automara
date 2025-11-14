@@ -13,12 +13,14 @@ function AutomationsLibrary() {
   const [workflowDetails, setWorkflowDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Get user from localStorage at the component level
+  const user = JSON.parse(localStorage.getItem('user'));
+
   useEffect(() => {
     fetchWorkflows();
   }, []);
 
   const getAuthHeaders = () => {
-    const user = JSON.parse(localStorage.getItem('user'));
     return {
       'x-user-id': user?.id?.toString() || '',
       'x-user-role': user?.role || 'client_user',
@@ -60,7 +62,6 @@ function AutomationsLibrary() {
       ]);
 
       const allWorkflows = workflowsResponse.data.workflows || [];
-      const user = JSON.parse(localStorage.getItem('user'));
 
       const libraryTemplates = allWorkflows.filter(
         (w) => w.is_template === true || w.tenant_id === null
@@ -238,29 +239,30 @@ function AutomationsLibrary() {
                 : 'Manage the workflows deployed into your tenant.'}
             </p>
           </div>
-
-          <button
-            onClick={handleSyncN8N}
-            disabled={syncing}
-            className="group px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <svg
-              className={`w-5 h-5 ${
-                syncing ? 'animate-spin' : ''
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            
+          {/* Sync with n8n button - only visible to global admins */}
+          {user?.role === 'global_admin' && (
+            <button
+              onClick={handleSyncN8N}
+              disabled={syncing}
+              className="group px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 0019 5"
-              />
-            </svg>
-            <span>{syncing ? 'Syncing Workflows...' : 'Sync from n8n'}</span>
-          </button>
+              <svg
+                className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 0119 5"
+                />
+              </svg>
+              <span>{syncing ? 'Syncing Workflows...' : 'Sync from n8n'}</span>
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -631,63 +633,58 @@ function AutomationsLibrary() {
                   </div>
                 ) : (
                   <>
+                    {/* Full Description */}
+                    {workflowDetails &&
+                      workflowDetails.nodes &&
+                      workflowDetails.nodes.length > 0 && (
+                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+                          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                            Full Description
+                          </h3>
+                          <div className="text-sm">
+                            {workflowDetails.nodes[0]?.notes ? (
+                              <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
+                                {workflowDetails.nodes[0].notes}
+                              </p>
+                            ) : (
+                              <p className="text-slate-500 italic">
+                                No description available for this workflow.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                     {/* Basic Info */}
                     <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
                       <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                        Basic Information
+                        Full Workflow Description 
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-slate-500">Status</p>
-                          <div className="mt-1">
-                            <span
-                              className={`px-3 py-1.5 rounded-full text-xs font-semibold border inline-flex items-center gap-1.5 ${
-                                selectedWorkflow.active
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                                  : 'bg-slate-700/40 text-slate-400 border-slate-600/40'
-                              }`}
-                            >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  selectedWorkflow.active
-                                    ? 'bg-emerald-400 animate-pulse'
-                                    : 'bg-slate-500'
-                                }`}
-                              />
-                              {selectedWorkflow.active
-                                ? 'Active'
-                                : 'Inactive'}
-                            </span>
-                          </div>
-                        </div>
-                        {selectedWorkflow.folder_name && (
-                          <div>
-                            <p className="text-slate-500">Folder</p>
-                            <p className="mt-1 text-slate-200">
-                              {selectedWorkflow.folder_name}
-                            </p>
-                          </div>
-                        )}
-                        {selectedWorkflow.created_at && (
-                          <div>
-                            <p className="text-slate-500">Created</p>
-                            <p className="mt-1 text-slate-200">
-                              {new Date(
-                                selectedWorkflow.created_at
-                              ).toLocaleString()}
-                            </p>
-                          </div>
-                        )}
-                        {selectedWorkflow.cloned_at && (
-                          <div>
-                            <p className="text-slate-500">Activated</p>
-                            <p className="mt-1 text-slate-200">
-                              {new Date(
-                                selectedWorkflow.cloned_at
-                              ).toLocaleString()}
-                            </p>
-                          </div>
-                        )}
+                      <p className="text-slate-300 whitespace-pre-wrap">
+                        {selectedWorkflow.notes || 'No description available'}
+                      </p>
+                    </div>
+
+                    {/* Status */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+                      <p className="text-slate-500">Status</p>
+                      <div className="mt-1">
+                        <span
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border inline-flex items-center gap-1.5 ${
+                            selectedWorkflow.active
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                              : 'bg-slate-700/40 text-slate-400 border-slate-600/40'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              selectedWorkflow.active
+                                ? 'bg-emerald-400 animate-pulse'
+                                : 'bg-slate-500'
+                            }`}
+                          />
+                          {selectedWorkflow.active ? 'Active' : 'Inactive'}
+                        </span>
                       </div>
                     </div>
 
@@ -859,6 +856,8 @@ function AutomationsLibrary() {
                   </>
                 )}
               </div>
+
+
 
               {/* Modal Footer */}
               <div className="flex flex-col md:flex-row gap-3 p-6 border-t border-slate-800 bg-slate-950/80">

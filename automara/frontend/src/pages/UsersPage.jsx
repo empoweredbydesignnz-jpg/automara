@@ -7,8 +7,18 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showRoleModal, setShowRoleModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // New user form state
+  const [newUser, setNewUser] = useState({
+    client_name: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: 'client_user'
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -72,6 +82,78 @@ function UsersPage() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedUser.first_name} ${selectedUser.last_name}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await axios.delete(`/api/users/${selectedUser.id}`, {
+        headers: {
+          'x-user-role': user?.role || 'client_user',
+          'x-tenant-id': user?.tenantId || ''
+        }
+      });
+      setShowRoleModal(false);
+      setSelectedUser(null);
+      fetchUsers();
+      alert('User deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert(error.response?.data?.error || 'Failed to delete user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    
+    // Basic validation
+    if (!newUser.client_name || !newUser.first_name || !newUser.last_name || !newUser.email) {
+      alert('Please fill in all fields');
+      setSaving(false);
+      return;
+    }
+    
+    if (!/\S+@\S+\.\S+/.test(newUser.email)) {
+      alert('Please enter a valid email address');
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await axios.post('/api/users', 
+        newUser,
+        {
+          headers: {
+            'x-user-role': user?.role || 'client_user',
+            'x-tenant-id': user?.tenantId || ''
+          }
+        }
+      );
+      setShowCreateModal(false);
+      setNewUser({
+        client_name: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        role: 'client_user'
+      });
+      fetchUsers();
+      alert('User created successfully!');
+    } catch (error) {
+      console.error('Error creating user:', error);
+      alert(error.response?.data?.error || 'Failed to create user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getRoleBadgeColor = (role) => {
     switch(role) {
       case 'global_admin':
@@ -105,6 +187,10 @@ function UsersPage() {
     (user.tenant_name && user.tenant_name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  // Check if current user is global admin
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const isGlobalAdmin = currentUser?.role === 'global_admin';
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
@@ -129,6 +215,21 @@ function UsersPage() {
           </h1>
           <p className="text-slate-400 text-lg">Manage user roles and permissions</p>
         </div>
+
+        {/* Create User Button (Global Admin Only) */}
+        {isGlobalAdmin && (
+          <div className="mb-8">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="group px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl font-semibold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all duration-300 hover:scale-105 flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              <span>Create New User</span>
+            </button>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="relative mb-6">
@@ -386,12 +487,155 @@ function UsersPage() {
                 <button
                   onClick={() => setShowRoleModal(false)}
                   disabled={saving}
-                  className="flex-1 px-6 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-semibold transition-all"
+                  className="flex-1 px-6 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete User
+                </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-2xl max-w-2xl w-full overflow-hidden">
+            <div className="relative p-8 border-b border-slate-800">
+              <div className="absolute inset-0 bg-gradient-to-r from-green-600/10 to-emerald-600/10"></div>
+              <div className="relative flex items-start justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mb-2">
+                    Create New User
+                  </h2>
+                  <p className="text-slate-400">Add a new user to the system</p>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="p-8 space-y-6">
+              {/* Client Information */}
+              <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Client Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-300 text-sm font-medium mb-2">Client Name</label>
+                    <input
+                      type="text"
+                      value={newUser.client_name}
+                      onChange={(e) => setNewUser({...newUser, client_name: e.target.value})}
+                      placeholder="Enter client name"
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-2 focus:ring-green-500/20 transition-all"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 text-sm font-medium mb-2">Role</label>
+                    <select
+                      value={newUser.role}
+                      onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-2 focus:ring-green-500/20 transition-all"
+                      required
+                    >
+                      {roles.map((role) => (
+                        <option key={role.id} value={role.name}>
+                          {role.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Details */}
+              <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">User Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-300 text-sm font-medium mb-2">First Name</label>
+                    <input
+                      type="text"
+                      value={newUser.first_name}
+                      onChange={(e) => setNewUser({...newUser, first_name: e.target.value})}
+                      placeholder="Enter first name"
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-2 focus:ring-green-500/20 transition-all"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 text-sm font-medium mb-2">Last Name</label>
+                    <input
+                      type="text"
+                      value={newUser.last_name}
+                      onChange={(e) => setNewUser({...newUser, last_name: e.target.value})}
+                      placeholder="Enter last name"
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-2 focus:ring-green-500/20 transition-all"
+                      required
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-slate-300 text-sm font-medium mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                      placeholder="Enter email address"
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:ring-2 focus:ring-green-500/20 transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-xl font-semibold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                      <span>Creating User...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                      <span>Create User</span>
+                    </div>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

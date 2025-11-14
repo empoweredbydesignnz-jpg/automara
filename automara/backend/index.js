@@ -4,6 +4,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const axios = require('axios');
 const workflowActivationRoutes = require('./routes/workflow-activation');
+const userRoutes = require('./routes/users');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -421,94 +422,8 @@ app.get('/api/roles', async (req, res) => {
   }
 });
 
-// Get all users (admin only)
-app.get('/api/users', filterTenantsByRole, async (req, res) => {
-  const effectiveRole = req.userRole === 'admin' ? 'global_admin' : req.userRole;
-  
-  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin' && effectiveRole !== 'msp_admin') {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  
-  try {
-    let query;
-    let params = [];
-    
-    if (effectiveRole === 'global_admin') {
-  query = `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name
-    FROM users u
-    LEFT JOIN client_tenants t ON u.tenant_id = t.id
-    ORDER BY u.created_at DESC
-  `;
-} else if (effectiveRole === 'msp_admin') {
-  if (!req.tenantId) return res.status(403).json({ error: 'Access denied - no tenant ID' });
-
-  query = `
-    WITH RECURSIVE sub_tenants AS (
-      SELECT id FROM client_tenants WHERE id = $1
-      UNION ALL
-      SELECT ct.id FROM client_tenants ct
-      INNER JOIN sub_tenants st ON ct.parent_tenant_id = st.id
-    )
-    SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name
-    FROM users u
-    JOIN sub_tenants st ON u.tenant_id = st.id
-    LEFT JOIN client_tenants t ON u.tenant_id = t.id
-    ORDER BY u.created_at DESC
-  `;
-  params = [req.tenantId];
-} else if (effectiveRole === 'client_admin') {
-  query = `
-    SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.tenant_id, u.status, t.name as tenant_name
-    FROM users u
-    LEFT JOIN client_tenants t ON u.tenant_id = t.id
-    WHERE u.tenant_id = $1
-    ORDER BY u.created_at DESC
-  `;
-  params = [req.tenantId];
-}
-
-
-    
-    const result = await pool.query(query, params);
-    res.json({ users: result.rows });
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update user role (admin only)
-app.patch('/api/users/:id/role', filterTenantsByRole, async (req, res) => {
-  const effectiveRole = req.userRole === 'admin' ? 'global_admin': req.userRole;
-  const { id } = req.params;
-  const { role } = req.body;
-  
-  // Only global_admin and client_admin can change roles
-  if (effectiveRole !== 'global_admin' && effectiveRole !== 'client_admin' && effectiveRole !== 'msp_admin') {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-  
-  // Client admins can't assign global_admin role
-  if (effectiveRole === 'client_admin' && role === 'global_admin') {
-    return res.status(403).json({ error: 'Cannot assign global admin role' });
-  }
-  
-  try {
-    const result = await pool.query(
-      'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-      [role, id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    res.json({ success: true, user: result.rows[0] });
-  } catch (error) {
-    console.error('Error updating user role:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// User routes (handles GET, POST, PATCH, DELETE)
+app.use('/api/users', userRoutes(pool));
 
 // Workflows API endpoints
 app.get('/api/workflows', filterTenantsByRole, async (req, res) => {
@@ -701,6 +616,9 @@ app.patch('/api/workflows/:id/toggle', filterTenantsByRole, async (req, res) => 
 });
 
 app.use('/api', workflowActivationRoutes);
+
+// User routes
+app.use('/api/users', userRoutes(pool));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
