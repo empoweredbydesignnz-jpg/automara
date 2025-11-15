@@ -1,89 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
-
-// GradientBackground Component
-const GradientBackground = () => {
-  const interactiveRef = useRef(null);
-  const [curX, setCurX] = useState(0);
-  const [curY, setCurY] = useState(0);
-  const [tgX, setTgX] = useState(0);
-  const [tgY, setTgY] = useState(0);
-  const [isSafari, setIsSafari] = useState(false);
-
-  useEffect(() => {
-    setIsSafari(/^((?!chrome|android).)*safari/i.test(navigator.userAgent));
-  }, []);
-
-  useEffect(() => {
-    const moveInterval = setInterval(() => {
-      setCurX((prev) => prev + (tgX - prev) / 20);
-      setCurY((prev) => prev + (tgY - prev) / 20);
-
-      if (interactiveRef.current) {
-        interactiveRef.current.style.transform = `translate(${Math.round(curX)}px, ${Math.round(curY)}px)`;
-      }
-    }, 1000 / 60);
-
-    return () => clearInterval(moveInterval);
-  }, [curX, curY, tgX, tgY]);
-
-  const handleMouseMove = (event) => {
-    if (interactiveRef.current) {
-      const rect = interactiveRef.current.getBoundingClientRect();
-      setTgX(event.clientX - rect.left);
-      setTgY(event.clientY - rect.top);
-    }
-  };
-
-  return (
-    <div className="h-full w-full relative overflow-hidden bg-[linear-gradient(40deg,rgb(108,0,162),rgb(0,17,82))]">
-      <svg className="hidden">
-        <defs>
-          <filter id="blurMe">
-            <feGaussianBlur
-              in="SourceGraphic"
-              stdDeviation="10"
-              result="blur"
-            />
-            <feColorMatrix
-              in="blur"
-              mode="matrix"
-              values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 18 -8"
-              result="goo"
-            />
-            <feBlend in="SourceGraphic" in2="goo" />
-          </filter>
-        </defs>
-      </svg>
-
-      <div
-        className={`gradients-container h-full w-full blur-lg ${isSafari ? "blur-2xl" : "[filter:url(#blurMe)_blur(40px)]"}`}
-      >
-        <div className="absolute [background:radial-gradient(circle_at_center,_rgba(18,113,255,0.8)_0,_rgba(18,113,255,0)_50%)_no-repeat] [mix-blend-mode:hard-light] w-[80%] h-[80%] top-[calc(50%-40%)] left-[calc(50%-40%)] [transform-origin:center_center] animate-first opacity-100" />
-        <div className="absolute [background:radial-gradient(circle_at_center,_rgba(221,74,255,0.8)_0,_rgba(221,74,255,0)_50%)_no-repeat] [mix-blend-mode:hard-light] w-[80%] h-[80%] top-[calc(50%-40%)] left-[calc(50%-40%)] [transform-origin:calc(50%-400px)] animate-second opacity-100" />
-        <div className="absolute [background:radial-gradient(circle_at_center,_rgba(100,220,255,0.8)_0,_rgba(100,220,255,0)_50%)_no-repeat] [mix-blend-mode:hard-light] w-[80%] h-[80%] top-[calc(50%-40%)] left-[calc(50%-40%)] [transform-origin:calc(50%+400px)] animate-third opacity-100" />
-        <div className="absolute [background:radial-gradient(circle_at_center,_rgba(200,50,50,0.8)_0,_rgba(200,50,50,0)_50%)_no-repeat] [mix-blend-mode:hard-light] w-[80%] h-[80%] top-[calc(50%-40%)] left-[calc(50%-40%)] [transform-origin:calc(50%-200px)] animate-fourth opacity-70" />
-        <div className="absolute [background:radial-gradient(circle_at_center,_rgba(180,180,50,0.8)_0,_rgba(180,180,50,0)_50%)_no-repeat] [mix-blend-mode:hard-light] w-[80%] h-[80%] top-[calc(50%-40%)] left-[calc(50%-40%)] [transform-origin:calc(50%-800px)_calc(50%+800px)] animate-fifth opacity-100" />
-
-        <div
-          ref={interactiveRef}
-          onMouseMove={handleMouseMove}
-          className="absolute [background:radial-gradient(circle_at_center,_rgba(140,100,255,0.8)_0,_rgba(140,100,255,0)_50%)_no-repeat] [mix-blend-mode:hard-light] w-full h-full -top-1/2 -left-1/2 opacity-70"
-        />
-      </div>
-
-      <div className="relative z-10 h-full flex items-center justify-center">
-        <div className="text-white text-center">
-          <h1 className="text-5xl font-bold mb-4">Gradient Background</h1>
-          <p className="text-xl">
-            Interactive animated background with mouse tracking
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -196,38 +113,6 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
         </svg>
       ),
     },
-    ...(user?.role === 'global_admin' ||
-    user?.role === 'admin' ||
-    user?.role === 'client_admin' ||
-    user?.role === 'msp_admin'
-      ? [
-          {
-            name: 'Billing',
-            path: '/billing',
-            icon: (
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M16 8v8l-4-4 4-4zM8 8v8l-4-4 4-4"
-                />
-                <path
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 12c0 4.418-4.477 8-10 8a12.25 12.25 0 01-4.5-.5c-.1-.04-.2-.08-.27-.12l-.5-.4a11.7 11.7 0 01-3.4-4.4 12 12 0 01-1.5-3.6V5.5c0-1.1.9-2 2-2h1.5a2 2 0 012 2v1c0 1.1-.9 2-2 2H4a2 2 0 01-2-2V5c0-1.1.9-2 2-2h1c1.1 0 2 .9 2 2v1.5c0 .1-.04 .2-.08 .27l-.4 .5a11.7 11.7 0 004.4 3.4A12.25 12.25 0 0015.5 19.5c.4.04.8.08 1.2.08 1.6.04 2.1 0"
-                />
-              </svg>
-            ),
-          },
-        ]
-      : []),
     {
       name: 'Settings',
       path: '/settings',
@@ -253,32 +138,6 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
         </svg>
       ),
     },
-    ...(user?.role === 'global_admin' ||
-    user?.role === 'admin' ||
-    user?.role === 'client_admin' ||
-    user?.role === 'msp_admin'
-      ? [
-          {
-            name: 'Reporting',
-            path: '/reporting',
-            icon: (
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6M12 3v14M5 11h14"
-                />
-              </svg>
-            ),
-          },
-        ]
-      : []),
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -431,7 +290,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
             <div className="w-full bg-slate-950/70 hover:bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-3 flex items-center gap-3 transition-all">
               {sidebarOpen ? (
                 <>
-                  <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-purple-500/30">
+                  <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md shadow-purple-500/30">
                     {tenantInitial}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -454,7 +313,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
                   </div>
                 </>
               ) : (
-                <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-purple-500/30">
+                <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md shadow-purple-500/30">
                   {tenantInitial}
                 </div>
               )}
@@ -476,7 +335,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
                   }`}
                 >
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justifycenter transition-all ${
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                       active
                         ? 'bg-white/10 text-white'
                         : 'bg-slate-900/80 text-slate-400 group-hover:bg-slate-900 group-hover:text-purple-300'
@@ -504,7 +363,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
           <div className="px-4 py-4 border-t border-slate-800/80">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justifycenter text-white font-bold shadow-lg shadow-blue-500/30">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">
                   {userInitial}
                 </div>
                 <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-950" />
@@ -567,19 +426,8 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto relative">
-        {/* Apply GradientBackground when on dashboard */}
-        {location.pathname === '/dashboard' ? (
-          <div className="absolute inset-0 z-0">
-            <GradientBackground />
-          </div>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 z-0" />
-        )}
-        
-        <div className="relative z-10 min-h-screen">
-          {children}
-        </div>
+      <main className="flex-1 overflow-auto">
+        {children}
       </main>
     </div>
   );
