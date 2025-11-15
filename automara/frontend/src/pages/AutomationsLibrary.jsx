@@ -642,15 +642,41 @@ function AutomationsLibrary() {
                             Full Description
                           </h3>
                           <div className="text-sm">
-                            {workflowDetails.nodes[0]?.notes ? (
-                              <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
-                                {workflowDetails.nodes[0].notes}
-                              </p>
-                            ) : (
-                              <p className="text-slate-500 italic">
-                                No description available for this workflow.
-                              </p>
-                            )}
+                            {(() => {
+                              // Try to get notes from workflowDetails first
+                              if (workflowDetails?.nodes?.[0]?.notes) {
+                                return (
+                                  <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
+                                    {workflowDetails.nodes[0].notes}
+                                  </p>
+                                );
+                              }
+                              
+                              // Fall back to selectedWorkflow.n8n_data
+                              try {
+                                const data = selectedWorkflow.n8n_data
+                                  ? typeof selectedWorkflow.n8n_data === 'string'
+                                    ? JSON.parse(selectedWorkflow.n8n_data)
+                                    : selectedWorkflow.n8n_data
+                                  : null;
+                                
+                                if (data?.nodes?.[0]?.notes) {
+                                  return (
+                                    <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
+                                      {data.nodes[0].notes}
+                                    </p>
+                                  );
+                                }
+                              } catch (error) {
+                                console.error('Error parsing workflow data:', error);
+                              }
+                              
+                              return (
+                                <p className="text-slate-500 italic">
+                                  No description available for this workflow.
+                                </p>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}
@@ -658,10 +684,10 @@ function AutomationsLibrary() {
                     {/* Basic Info */}
                     <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
                       <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                        Full Workflow Description 
+                        Workflow Overview
                       </h3>
                       <p className="text-slate-300 whitespace-pre-wrap">
-                        {selectedWorkflow.notes || 'No description available'}
+                        {getWorkflowDescription(selectedWorkflow)}
                       </p>
                     </div>
 
