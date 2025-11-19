@@ -28,7 +28,7 @@ function AutomationsLibrary() {
     };
   };
 
-  const getWorkflowDescription = (workflow) => {
+  const getWorkflowDescription = (workflow, truncate = true) => {
     try {
       const data = workflow.n8n_data
         ? typeof workflow.n8n_data === 'string'
@@ -41,7 +41,11 @@ function AutomationsLibrary() {
           (node) => node.notes && node.notes.trim()
         );
         if (nodeWithNotes && nodeWithNotes.notes) {
-          const words = nodeWithNotes.notes.trim().split(/\s+/);
+          const fullNotes = nodeWithNotes.notes.trim();
+          if (!truncate) {
+            return fullNotes;
+          }
+          const words = fullNotes.split(/\s+/);
           return (
             words.slice(0, 16).join(' ') +
             (words.length > 16 ? '...' : '')
@@ -347,7 +351,8 @@ function AutomationsLibrary() {
             {displayedWorkflows.map((workflow) => (
               <div
                 key={workflow.id}
-                className="group relative bg-gradient-to-br from-slate-900/55 to-slate-900/25 backdrop-blur-sm rounded-2xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 overflow-hidden"
+                onClick={() => fetchWorkflowDetails(workflow)}
+                className="group relative bg-gradient-to-br from-slate-900/55 to-slate-900/25 backdrop-blur-sm rounded-2xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 overflow-hidden cursor-pointer"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-600/0 via-purple-600/0 to-pink-600/0 group-hover:from-purple-600/5 group-hover:to-pink-600/5 transition-all duration-300" />
                 <div className="relative p-6 flex flex-col h-full">
@@ -457,7 +462,10 @@ function AutomationsLibrary() {
                     {activeTab === 'library' ? (
                       <>
                         <button
-                          onClick={() => fetchWorkflowDetails(workflow)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fetchWorkflowDetails(workflow);
+                          }}
                           className="flex-1 px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs rounded-xl border border-slate-700 hover:border-purple-500/40 transition-all flex items-center justify-center gap-1.5"
                         >
                           <svg
@@ -482,9 +490,10 @@ function AutomationsLibrary() {
                           Info
                         </button>
                         <button
-                          onClick={() =>
-                            handleActivateWorkflow(workflow.id)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleActivateWorkflow(workflow.id);
+                          }}
                           disabled={activating === workflow.id}
                           className="flex-1 px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs rounded-xl font-semibold shadow-md shadow-purple-500/25 hover:shadow-purple-500/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                         >
@@ -516,7 +525,10 @@ function AutomationsLibrary() {
                     ) : (
                       <>
                         <button
-                          onClick={() => fetchWorkflowDetails(workflow)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fetchWorkflowDetails(workflow);
+                          }}
                           className="flex-1 px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs rounded-xl border border-slate-700 hover:border-purple-500/40 transition-all flex items-center justify-center gap-1.5"
                         >
                           <svg
@@ -536,9 +548,10 @@ function AutomationsLibrary() {
                         </button>
                         {workflow.active && (
                           <button
-                            onClick={() =>
-                              handleDeactivateWorkflow(workflow.id)
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeactivateWorkflow(workflow.id);
+                            }}
                             disabled={activating === workflow.id}
                             className="flex-1 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs rounded-xl font-semibold border border-blue-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                           >
@@ -643,32 +656,28 @@ function AutomationsLibrary() {
                           </h3>
                           <div className="text-sm">
                             {(() => {
-                              // Try to get notes from workflowDetails first
-                              if (workflowDetails?.nodes?.[0]?.notes) {
-                                return (
-                                  <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
-                                    {workflowDetails.nodes[0].notes}
-                                  </p>
+                              // Try to get notes from workflowDetails - find first node with notes
+                              if (workflowDetails?.nodes) {
+                                const nodeWithNotes = workflowDetails.nodes.find(
+                                  (node) => node.notes && node.notes.trim()
                                 );
-                              }
-                              
-                              // Fall back to selectedWorkflow.n8n_data
-                              try {
-                                const data = selectedWorkflow.n8n_data
-                                  ? typeof selectedWorkflow.n8n_data === 'string'
-                                    ? JSON.parse(selectedWorkflow.n8n_data)
-                                    : selectedWorkflow.n8n_data
-                                  : null;
-                                
-                                if (data?.nodes?.[0]?.notes) {
+                                if (nodeWithNotes?.notes) {
                                   return (
                                     <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
-                                      {data.nodes[0].notes}
+                                      {nodeWithNotes.notes}
                                     </p>
                                   );
                                 }
-                              } catch (error) {
-                                console.error('Error parsing workflow data:', error);
+                              }
+                              
+                              // Fall back to selectedWorkflow.n8n_data
+                              const fullDescription = getWorkflowDescription(selectedWorkflow, false);
+                              if (fullDescription && fullDescription !== 'Automation workflow template') {
+                                return (
+                                  <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
+                                    {fullDescription}
+                                  </p>
+                                );
                               }
                               
                               return (
@@ -687,7 +696,7 @@ function AutomationsLibrary() {
                         Workflow Overview
                       </h3>
                       <p className="text-slate-300 whitespace-pre-wrap">
-                        {getWorkflowDescription(selectedWorkflow)}
+                        {getWorkflowDescription(selectedWorkflow, false)}
                       </p>
                     </div>
 
