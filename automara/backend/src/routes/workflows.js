@@ -84,7 +84,7 @@ router.get('/', async (req, res) => {
             `SELECT id, n8n_workflow_id, name, n8n_data, active, is_template, tenant_id,
                     created_at, updated_at, cloned_at, folder_name, template_id
              FROM public.workflows
-             WHERE tenant_id = $1 AND is_template = false AND active = true
+             WHERE tenant_id = $1 AND is_template = false
              ORDER BY created_at DESC`,
             [tenantId]
         );

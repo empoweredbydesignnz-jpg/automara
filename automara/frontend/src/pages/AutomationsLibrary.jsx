@@ -12,6 +12,9 @@ function AutomationsLibrary() {
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
   const [workflowDetails, setWorkflowDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [togglingWorkflow, setTogglingWorkflow] = useState(false);
+  const [togglingCardWorkflow, setTogglingCardWorkflow] = useState(null);
 
   // Get user from localStorage at the component level
   const user = JSON.parse(localStorage.getItem('user'));
@@ -205,6 +208,65 @@ function AutomationsLibrary() {
       );
     } finally {
       setActivating(null);
+    }
+  };
+
+  const handleToggleWorkflowStatus = async () => {
+    if (!selectedWorkflow) return;
+
+    try {
+      setTogglingWorkflow(true);
+      const endpoint = selectedWorkflow.active
+        ? `/api/workflows/${selectedWorkflow.id}/stop`
+        : `/api/workflows/${selectedWorkflow.id}/start`;
+
+      const response = await axios.post(endpoint, {}, {
+        headers: getAuthHeaders(),
+      });
+
+      if (response.data.success) {
+        // Update local state
+        setSelectedWorkflow({
+          ...selectedWorkflow,
+          active: !selectedWorkflow.active
+        });
+        await fetchWorkflows();
+      }
+    } catch (error) {
+      console.error('Error toggling workflow:', error);
+      alert(
+        'Failed to toggle workflow: ' +
+          (error.response?.data?.error || error.message)
+      );
+    } finally {
+      setTogglingWorkflow(false);
+    }
+  };
+
+  const handleCardToggleWorkflow = async (e, workflow) => {
+    e.stopPropagation();
+
+    try {
+      setTogglingCardWorkflow(workflow.id);
+      const endpoint = workflow.active
+        ? `/api/workflows/${workflow.id}/stop`
+        : `/api/workflows/${workflow.id}/start`;
+
+      const response = await axios.post(endpoint, {}, {
+        headers: getAuthHeaders(),
+      });
+
+      if (response.data.success) {
+        await fetchWorkflows();
+      }
+    } catch (error) {
+      console.error('Error toggling workflow:', error);
+      alert(
+        'Failed to toggle workflow: ' +
+          (error.response?.data?.error || error.message)
+      );
+    } finally {
+      setTogglingCardWorkflow(null);
     }
   };
 
@@ -402,17 +464,17 @@ function AutomationsLibrary() {
                           className={`px-2.5 py-1 rounded-full text-[9px] font-semibold border inline-flex items-center gap-1.5 ${
                             workflow.active
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                              : 'bg-slate-700/40 text-slate-400 border-slate-600/40'
+                              : 'bg-red-500/10 text-red-400 border-red-500/25'
                           }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
                               workflow.active
                                 ? 'bg-emerald-400 animate-pulse'
-                                : 'bg-slate-500'
+                                : 'bg-red-400'
                             }`}
                           />
-                          {workflow.active ? 'Active' : 'Inactive'}
+                          {workflow.active ? 'Running' : 'Stopped'}
                         </span>
                       )}
                       {workflow.folder_name && (
@@ -544,35 +606,50 @@ function AutomationsLibrary() {
                     ) : (
                       <>
                         <button
+                          onClick={(e) => handleCardToggleWorkflow(e, workflow)}
+                          disabled={togglingCardWorkflow === workflow.id}
+                          className={`flex-1 px-3 py-2 text-xs rounded-xl font-semibold border transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 ${
+                            workflow.active
+                              ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30'
+                              : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          }`}
+                        >
+                          {togglingCardWorkflow === workflow.id ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-current/40 border-t-current rounded-full animate-spin" />
+                              <span>{workflow.active ? 'Stopping...' : 'Starting...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              {workflow.active ? (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              )}
+                              <span>{workflow.active ? 'Stop' : 'Start'}</span>
+                            </>
+                          )}
+                        </button>
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRemoveWorkflow(workflow.id);
                           }}
                           disabled={activating === workflow.id}
-                          className="flex-1 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded-xl font-semibold border border-red-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                          className="px-3 py-2 bg-slate-700/40 hover:bg-slate-700/60 text-slate-400 text-xs rounded-xl font-semibold border border-slate-600/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                         >
                           {activating === workflow.id ? (
-                            <>
-                              <div className="w-3.5 h-3.5 border-2 border-red-300/40 border-t-red-300 rounded-full animate-spin" />
-                              <span>Removing...</span>
-                            </>
+                            <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-400 rounded-full animate-spin" />
                           ) : (
-                            <>
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              </svg>
-                              <span>Deactivate</span>
-                            </>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           )}
                         </button>
                       </>
@@ -651,30 +728,47 @@ function AutomationsLibrary() {
                           </h3>
                           <div className="text-sm">
                             {(() => {
+                              let descriptionText = '';
+
                               // Try to get notes from workflowDetails - find first node with notes
                               if (workflowDetails?.nodes) {
                                 const nodeWithNotes = workflowDetails.nodes.find(
                                   (node) => node.notes && node.notes.trim()
                                 );
                                 if (nodeWithNotes?.notes) {
-                                  return (
-                                    <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
-                                      {nodeWithNotes.notes}
-                                    </p>
-                                  );
+                                  descriptionText = nodeWithNotes.notes;
                                 }
                               }
-                              
+
                               // Fall back to selectedWorkflow.n8n_data
-                              const fullDescription = getWorkflowDescription(selectedWorkflow, false);
-                              if (fullDescription && fullDescription !== 'Automation workflow template') {
+                              if (!descriptionText) {
+                                descriptionText = getWorkflowDescription(selectedWorkflow, false);
+                              }
+
+                              if (descriptionText && descriptionText !== 'Automation workflow template') {
+                                const lines = descriptionText.split('\n');
+                                const isLong = lines.length > 3 || descriptionText.length > 200;
+                                const displayText = descriptionExpanded
+                                  ? descriptionText
+                                  : lines.slice(0, 3).join('\n').substring(0, 200) + (isLong ? '...' : '');
+
                                 return (
-                                  <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
-                                    {fullDescription}
-                                  </p>
+                                  <div>
+                                    <p className="text-slate-200 bg-slate-900/90 rounded-lg p-4 border border-slate-800 whitespace-pre-wrap">
+                                      {displayText}
+                                    </p>
+                                    {isLong && (
+                                      <button
+                                        onClick={() => setDescriptionExpanded(!descriptionExpanded)}
+                                        className="mt-2 text-purple-400 hover:text-purple-300 text-xs font-medium"
+                                      >
+                                        {descriptionExpanded ? 'Show less' : 'Show more...'}
+                                      </button>
+                                    )}
+                                  </div>
                                 );
                               }
-                              
+
                               return (
                                 <p className="text-slate-500 italic">
                                   No description available for this workflow.
@@ -896,43 +990,45 @@ function AutomationsLibrary() {
                     setShowInfoModal(false);
                     setSelectedWorkflow(null);
                     setWorkflowDetails(null);
+                    setDescriptionExpanded(false);
                   }}
                   className="flex-1 px-5 py-3 bg-slate-900 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 border border-slate-700 transition-all"
                 >
                   Close
                 </button>
-                <a
-                  href={`${
-                    process.env.REACT_APP_N8N_URL ||
-                    'http://localhost:5678'
-                  }/workflow/${
-                    selectedWorkflow.n8n_workflow_id || ''
-                  }`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl text-xs font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all text-center flex items-center justify-center gap-2"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                {activeTab === 'my-workflows' && (
+                  <button
+                    onClick={handleToggleWorkflowStatus}
+                    disabled={togglingWorkflow}
+                    className={`flex-1 px-5 py-3 rounded-xl text-xs font-semibold shadow-lg transition-all text-center flex items-center justify-center gap-2 ${
+                      selectedWorkflow.active
+                        ? 'bg-red-500/80 hover:bg-red-600 text-white shadow-red-500/25 hover:shadow-red-500/40'
+                        : 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-emerald-500/25 hover:shadow-emerald-500/40'
+                    } disabled:opacity-60 disabled:cursor-not-allowed`}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M14 3h7m0 0v7m0-7L10 14"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 5v14h14"
-                    />
-                  </svg>
-                  <span>Open in n8n</span>
-                </a>
+                    {togglingWorkflow ? (
+                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : selectedWorkflow.active ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    <span>{selectedWorkflow.active ? 'Stop' : 'Start'}</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded-full text-[9px] font-semibold ${
+                      selectedWorkflow.active
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : 'bg-slate-700/60 text-slate-400'
+                    }`}>
+                      {selectedWorkflow.active ? 'Active' : 'Stopped'}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

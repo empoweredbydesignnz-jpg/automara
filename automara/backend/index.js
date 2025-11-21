@@ -436,7 +436,7 @@ app.get('/api/workflows', filterTenantsByRole, async (req, res) => {
     }
 
     const query = `SELECT * FROM workflows
-                   WHERE tenant_id = $1 AND is_template = false AND active = true
+                   WHERE tenant_id = $1 AND is_template = false
                    ORDER BY created_at DESC`;
 
     const result = await pool.query(query, [tenantId]);

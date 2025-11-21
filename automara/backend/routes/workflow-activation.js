@@ -157,7 +157,7 @@ router.post('/workflows/:id/activate', async (req, res) => {
     const folderId = await getOrCreateCompanyFolder(companyName);
     const clonedWorkflow = await cloneWorkflowToFolder(workflow.n8n_workflow_id, clonedWorkflowName, folderId);
     console.log('[DB] Creating workflow record');
-    const insertResult = await pool.query('INSERT INTO workflows (tenant_id, n8n_workflow_id, name, n8n_data, active, parent_workflow_id, folder_name, cloned_at, is_template, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), false, NOW(), NOW()) RETURNING *', [tenantId, clonedWorkflow.id, clonedWorkflowName, JSON.stringify(clonedWorkflow), true, workflow.id, companyName]);
+    const insertResult = await pool.query('INSERT INTO workflows (tenant_id, n8n_workflow_id, name, n8n_data, active, parent_workflow_id, folder_name, cloned_at, is_template, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), false, NOW(), NOW()) RETURNING *', [tenantId, clonedWorkflow.id, clonedWorkflowName, JSON.stringify(clonedWorkflow), false, workflow.id, companyName]);
     const newWorkflow = insertResult.rows[0];
     console.log('[DB] Workflow record created ID:', newWorkflow.id);
     console.log('[DB] Logging activation');
@@ -167,7 +167,7 @@ router.post('/workflows/:id/activate', async (req, res) => {
     res.json({
       success: true,
       message: 'Workflow activated successfully',
-      workflow: { id: newWorkflow.id, name: newWorkflow.name, n8n_workflow_id: clonedWorkflow.id, folder: companyName, active: true }
+      workflow: { id: newWorkflow.id, name: newWorkflow.name, n8n_workflow_id: clonedWorkflow.id, folder: companyName, active: false }
     });
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -175,6 +175,85 @@ router.post('/workflows/:id/activate', async (req, res) => {
     console.error('[ERROR]', error.message);
     console.error('[STACK]', error.stack);
     res.status(500).json({ success: false, error: 'Failed to activate workflow', message: error.message });
+  }
+});
+
+router.post('/workflows/:id/start', async (req, res) => {
+  console.log('=== WORKFLOW START ===');
+  try {
+    const { id } = req.params;
+    const tenantId = req.headers['x-tenant-id'];
+    const userRole = req.headers['x-user-role'];
+
+    const workflowResult = await pool.query('SELECT id, n8n_workflow_id, tenant_id FROM workflows WHERE id = $1', [id]);
+    if (workflowResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Workflow not found' });
+    }
+    const workflow = workflowResult.rows[0];
+
+    const effectiveRole = userRole === 'admin' ? 'global_admin' : userRole;
+    if (effectiveRole !== 'global_admin' && workflow.tenant_id !== parseInt(tenantId)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    // Activate workflow in n8n using the activate endpoint
+    console.log('[N8N] Activating workflow', workflow.n8n_workflow_id);
+    await axios.post(N8N_API_URL + '/workflows/' + workflow.n8n_workflow_id + '/activate', {}, {
+      headers: { 'X-N8N-API-KEY': N8N_API_KEY },
+      timeout: 10000
+    });
+    console.log('[N8N] Workflow activated');
+
+    // Update database
+    await pool.query('UPDATE workflows SET active = true, updated_at = NOW() WHERE id = $1', [id]);
+
+    console.log('=== WORKFLOW STARTED ===');
+    res.json({ success: true, message: 'Workflow started successfully' });
+  } catch (error) {
+    console.error('=== WORKFLOW START FAILED ===');
+    console.error('[ERROR]', error.message);
+    if (error.response) {
+      console.error('[N8N Response]', JSON.stringify(error.response.data).substring(0, 500));
+    }
+    res.status(500).json({ success: false, error: 'Failed to start workflow', message: error.message });
+  }
+});
+
+router.post('/workflows/:id/stop', async (req, res) => {
+  console.log('=== WORKFLOW STOP ===');
+  try {
+    const { id } = req.params;
+    const tenantId = req.headers['x-tenant-id'];
+    const userRole = req.headers['x-user-role'];
+
+    const workflowResult = await pool.query('SELECT id, n8n_workflow_id, tenant_id FROM workflows WHERE id = $1', [id]);
+    if (workflowResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Workflow not found' });
+    }
+    const workflow = workflowResult.rows[0];
+
+    const effectiveRole = userRole === 'admin' ? 'global_admin' : userRole;
+    if (effectiveRole !== 'global_admin' && workflow.tenant_id !== parseInt(tenantId)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    // Deactivate workflow in n8n using the deactivate endpoint
+    console.log('[N8N] Deactivating workflow', workflow.n8n_workflow_id);
+    await axios.post(N8N_API_URL + '/workflows/' + workflow.n8n_workflow_id + '/deactivate', {}, {
+      headers: { 'X-N8N-API-KEY': N8N_API_KEY },
+      timeout: 10000
+    });
+    console.log('[N8N] Workflow deactivated');
+
+    // Update database
+    await pool.query('UPDATE workflows SET active = false, updated_at = NOW() WHERE id = $1', [id]);
+
+    console.log('=== WORKFLOW STOPPED ===');
+    res.json({ success: true, message: 'Workflow stopped successfully' });
+  } catch (error) {
+    console.error('=== WORKFLOW STOP FAILED ===');
+    console.error('[ERROR]', error.message);
+    res.status(500).json({ success: false, error: 'Failed to stop workflow', message: error.message });
   }
 });
 
@@ -210,9 +289,9 @@ router.post('/workflows/:id/deactivate', async (req, res) => {
       }
     }
 
-    // Update database - mark as inactive
-    console.log('[DB] Updating workflow status');
-    await pool.query('UPDATE workflows SET active = false, updated_at = NOW() WHERE id = $1', [id]);
+    // Delete from database
+    console.log('[DB] Deleting workflow from database');
+    await pool.query('DELETE FROM workflows WHERE id = $1', [id]);
 
     console.log('=== DEACTIVATION SUCCESS ===');
     res.json({ success: true, message: 'Workflow deactivated successfully' });
