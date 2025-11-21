@@ -1,140 +1,94 @@
 // backend/src/routes/workflows.js
-// Workflow management routes with template provisioning
-
 const express = require('express');
 const router = express.Router();
 const { getN8NService } = require('../services/n8n');
 const { verifyResourceOwnership } = require('../middleware/tenant');
-const EncryptionService = require('../services/encryption');
 
-console.log('✅ workflows.js loaded');
-
-router.get('/test', (req, res) => {
-  res.json({ message: 'Test endpoint works!' });
-});
-
-/**
- * @swagger
- * /api/workflows/sync:
- *   post:
- *     summary: Sync existing N8N workflows into the system
- *     tags: [Workflows]
- *     security:
- *       - bearerAuth: []
- */
 router.post('/sync', async (req, res) => {
     try {
         const n8n = getN8NService();
-        
-        // Get all workflows from N8N
         const n8nWorkflows = await n8n.getAllWorkflows();
-        
         const syncedWorkflows = [];
         
         for (const n8nWorkflow of n8nWorkflows) {
-            // Check if workflow already exists in database
+            const workflowName = n8nWorkflow.name || '';
+            const tags = n8nWorkflow.tags || [];
+            
+            if (workflowName.includes(' - ')) {
+                continue;
+            }
+            
+            const hasLibraryTag = tags.some(tag => tag.name === 'library');
+            if (!hasLibraryTag) {
+                continue;
+            }
+            
             const existing = await global.db.query(
-                `SELECT id FROM ${req.schemaName}.workflows WHERE n8n_workflow_id = $1`,
+                `SELECT id FROM public.workflows WHERE n8n_workflow_id = $1`,
                 [n8nWorkflow.id]
             );
-            
+
             if (existing.rows.length === 0) {
-                // Create workflow in database
                 const result = await global.db.query(
-                    `INSERT INTO ${req.schemaName}.workflows 
-                    (n8n_workflow_id, workflow_type, name, description, 
-                     webhook_url, is_active, configuration, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+                    `INSERT INTO public.workflows
+                    (n8n_workflow_id, name, n8n_data, is_template, tenant_id, active, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING *`,
-                    [
-                        n8nWorkflow.id,
-                        n8nWorkflow.type || 'custom',
-                        n8nWorkflow.name,
-                        n8nWorkflow.description || 'Imported from N8N',
-                        n8nWorkflow.webhook_url || null,
-                        n8nWorkflow.active || false,
-                        JSON.stringify({
-                            imported: true,
-                            original_data: n8nWorkflow
-                        })
-                    ]
+                    [n8nWorkflow.id, n8nWorkflow.name, JSON.stringify(n8nWorkflow), true, null, false]
+                );
+                syncedWorkflows.push(result.rows[0]);
+            } else {
+                // Update existing workflow to ensure it's marked as template
+                const result = await global.db.query(
+                    `UPDATE public.workflows
+                    SET is_template = true, tenant_id = NULL, n8n_data = $1, name = $2, updated_at = CURRENT_TIMESTAMP
+                    WHERE n8n_workflow_id = $3
+                    RETURNING *`,
+                    [JSON.stringify(n8nWorkflow), n8nWorkflow.name, n8nWorkflow.id]
                 );
                 syncedWorkflows.push(result.rows[0]);
             }
         }
         
-        res.json({ 
-            success: true, 
-            message: `Synced ${syncedWorkflows.length} workflows`,
-            workflows: syncedWorkflows 
-        });
+        res.json({ success: true, message: `Synced ${syncedWorkflows.length} templates`, workflows: syncedWorkflows });
     } catch (err) {
         console.error('Error syncing workflows:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-/**
- * @swagger
- * /api/workflows/n8n:
- *   get:
- *     summary: Get all workflows directly from N8N
- *     tags: [Workflows]
- *     security:
- *       - bearerAuth: []
- */
-router.get('/n8n', async (req, res) => {
-    try {
-        const n8n = getN8NService();
-        const workflows = await n8n.getAllWorkflows();
-        res.json({ workflows });
-    } catch (err) {
-        console.error('Error fetching N8N workflows:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /api/workflows/templates:
- *   get:
- *     summary: Get available workflow templates
- *     tags: [Workflows]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of available workflow templates
- */
 router.get('/templates', async (req, res) => {
     try {
-        const n8n = getN8NService();
-        const templates = await n8n.getTemplates();
-        res.json({ templates });
+        const result = await global.db.query(
+            `SELECT id, n8n_workflow_id, name, n8n_data, active, created_at, updated_at
+             FROM public.workflows
+             WHERE is_template = true AND tenant_id IS NULL
+             ORDER BY created_at DESC`
+        );
+        res.json({ templates: result.rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-/**
- * @swagger
- * /api/workflows:
- *   get:
- *     summary: Get all workflows for the tenant
- *     tags: [Workflows]
- *     security:
- *       - bearerAuth: []
- */
 router.get('/', async (req, res) => {
     try {
+        const tenantId = req.headers['x-tenant-id'];
+
+        // If no tenantId (e.g., global_admin), return empty array
+        if (!tenantId) {
+            return res.json({ workflows: [] });
+        }
+
         const result = await global.db.query(
-            `SELECT id, n8n_workflow_id, workflow_type, name, description, 
-                    webhook_url, is_active, created_at, updated_at, 
-                    last_executed, execution_count
-             FROM ${req.schemaName}.workflows
-             ORDER BY created_at DESC`
+            `SELECT id, n8n_workflow_id, name, n8n_data, active, is_template, tenant_id,
+                    created_at, updated_at, cloned_at, folder_name, template_id
+             FROM public.workflows
+             WHERE tenant_id = $1 AND is_template = false AND active = true
+             ORDER BY created_at DESC`,
+            [tenantId]
         );
-        
+
         res.json({ workflows: result.rows });
     } catch (err) {
         console.error('Error fetching workflows:', err);
@@ -142,90 +96,125 @@ router.get('/', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /api/workflows:
- *   post:
- *     summary: Create a new workflow from template
- *     tags: [Workflows]
- *     security:
- *       - bearerAuth: []
- */
-router.post('/', async (req, res) => {
-    const { template_type, credentials } = req.body;
-    
-    if (!template_type) {
-        return res.status(400).json({ error: 'template_type is required' });
-    }
-    
-    if (!credentials) {
-        return res.status(400).json({ error: 'credentials are required' });
-    }
-    
+router.get('/n8n', async (req, res) => {
     try {
-        // Encrypt credentials before storing
-        const encryptedCredentials = {
-            client_id: EncryptionService.encrypt(credentials.client_id),
-            client_secret: EncryptionService.encrypt(credentials.client_secret),
-            tenant_id: EncryptionService.encrypt(credentials.tenant_id),
-        };
-        
-        // Store M365 config in tenant schema
-        await global.db.query(
-            `INSERT INTO ${req.schemaName}.m365_configs 
-            (tenant_id, encrypted_client_id, encrypted_client_secret, encrypted_tenant_id)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (id) DO UPDATE 
-            SET encrypted_client_id = $2, 
-                encrypted_client_secret = $3, 
-                encrypted_tenant_id = $4,
-                updated_at = CURRENT_TIMESTAMP`,
-            [
-                credentials.tenant_id,
-                encryptedCredentials.client_id,
-                encryptedCredentials.client_secret,
-                encryptedCredentials.tenant_id,
-            ]
-        );
-        
-        // Create workflow in N8N
         const n8n = getN8NService();
-        
-        // For N8N, we need decrypted credentials
-        const workflowResult = await n8n.createWorkflowFromTemplate(
-            template_type,
-            req.tenantId,
-            credentials, // Pass original credentials to N8N
-            req.schemaName
-        );
-        
-        // Fetch the created workflow
-        const result = await global.db.query(
-            `SELECT * FROM ${req.schemaName}.workflows 
-             WHERE n8n_workflow_id = $1`,
-            [workflowResult.workflowId]
-        );
-        
-        res.status(201).json({
-            message: 'Workflow created successfully',
-            workflow: result.rows[0],
-            webhook_url: workflowResult.webhookUrl,
-        });
+        const workflows = await n8n.getAllWorkflows();
+        res.json({ workflows });
     } catch (err) {
-        console.error('Error creating workflow:', err);
-        res.status(500).json({ 
-            error: 'Failed to create workflow',
-            details: err.message,
-        });
+        res.status(500).json({ error: err.message });
     }
 });
 
-/**
- * @swagger
- * /api/workflows/{id}:
- *   get:
- *     summary: Get a specific workflow
- */
+router.post('/', async (req, res) => {
+    const { template_id } = req.body;
+    const tenantId = req.tenantId;
+    const schemaName = req.schemaName;
+    const userId = req.headers['x-user-id'];
+
+    if (!template_id) {
+        return res.status(400).json({ error: 'template_id is required' });
+    }
+
+    try {
+        const n8n = getN8NService();
+
+        // 1. Fetch template details from public.workflows
+        const templateResult = await global.db.query(
+            `SELECT id, n8n_workflow_id, name, n8n_data FROM public.workflows WHERE id = $1 AND is_template = true`,
+            [template_id]
+        );
+
+        if (templateResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+
+        const template = templateResult.rows[0];
+
+        // 2. Get tenant details to create folder name
+        const tenantResult = await global.db.query(
+            'SELECT name FROM public.tenants WHERE id = $1',
+            [tenantId]
+        );
+
+        if (tenantResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Tenant not found' });
+        }
+        const companyName = tenantResult.rows[0].name;
+
+        // 3. Get or create company folder in n8n
+        const folderId = await n8n.getOrCreateCompanyFolder(companyName);
+
+        // 4. Clone workflow in n8n
+        const clonedWorkflowName = `${companyName} - ${template.name}`;
+        const clonedWorkflow = await n8n.cloneWorkflowToFolder(
+            template.n8n_workflow_id,
+            clonedWorkflowName,
+            folderId
+        );
+
+        // 5. Insert new workflow record into the tenant's schema
+        const insertResult = await global.db.query(`
+            INSERT INTO ${schemaName}.workflows (
+                tenant_id, 
+                n8n_workflow_id, 
+                name, 
+                n8n_data, 
+                active, 
+                parent_workflow_id,
+                folder_name, 
+                cloned_at, 
+                is_template,
+                created_at,
+                updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), false, NOW(), NOW())
+            RETURNING *
+        `, [
+            tenantId,
+            clonedWorkflow.id,
+            clonedWorkflowName,
+            JSON.stringify(clonedWorkflow),
+            true, // Active by default after cloning
+            template.id,
+            companyName
+        ]);
+
+        const newWorkflow = insertResult.rows[0];
+
+        // 6. Activate the newly cloned workflow in n8n
+        await n8n.activateWorkflow(clonedWorkflow.id);
+
+        // 7. Log activation
+        await global.db.query(`
+            INSERT INTO ${schemaName}.workflow_activations (
+                workflow_id, tenant_id, activated_by, 
+                n8n_workflow_id, folder_name, cloned_workflow_name
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+            newWorkflow.id,
+            tenantId,
+            userId || null,
+            clonedWorkflow.id,
+            companyName,
+            clonedWorkflowName
+        ]);
+        
+        res.status(201).json({
+            message: 'Workflow created and activated successfully',
+            workflow: {
+                id: newWorkflow.id,
+                name: newWorkflow.name,
+                n8n_workflow_id: clonedWorkflow.id,
+                folder: companyName,
+                active: true
+            }
+        });
+    } catch (err) {
+        console.error('Error creating workflow from template:', err.message);
+        res.status(500).json({ error: 'Failed to create workflow', details: err.message });
+    }
+});
+
 router.get('/:id', verifyResourceOwnership('workflows'), async (req, res) => {
     try {
         const result = await global.db.query(
@@ -239,20 +228,12 @@ router.get('/:id', verifyResourceOwnership('workflows'), async (req, res) => {
         
         res.json({ workflow: result.rows[0] });
     } catch (err) {
-        console.error('Error fetching workflow:', err);
         res.status(500).json({ error: 'Failed to fetch workflow' });
     }
 });
 
-/**
- * @swagger
- * /api/workflows/{id}/activate:
- *   post:
- *     summary: Activate a workflow
- */
 router.post('/:id/activate', verifyResourceOwnership('workflows'), async (req, res) => {
     try {
-        // Get workflow
         const workflowResult = await global.db.query(
             `SELECT n8n_workflow_id FROM ${req.schemaName}.workflows WHERE id = $1`,
             [req.params.id]
@@ -262,33 +243,20 @@ router.post('/:id/activate', verifyResourceOwnership('workflows'), async (req, r
             return res.status(404).json({ error: 'Workflow not found' });
         }
         
-        const n8nWorkflowId = workflowResult.rows[0].n8n_workflow_id;
-        
-        // Activate in N8N
         const n8n = getN8NService();
-        await n8n.activateWorkflow(n8nWorkflowId);
+        await n8n.activateWorkflow(workflowResult.rows[0].n8n_workflow_id);
         
-        // Update status in database
         await global.db.query(
-            `UPDATE ${req.schemaName}.workflows 
-             SET is_active = true, updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $1`,
+            `UPDATE ${req.schemaName}.workflows SET is_active = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
             [req.params.id]
         );
         
         res.json({ message: 'Workflow activated successfully' });
     } catch (err) {
-        console.error('Error activating workflow:', err);
         res.status(500).json({ error: 'Failed to activate workflow' });
     }
 });
 
-/**
- * @swagger
- * /api/workflows/{id}/deactivate:
- *   post:
- *     summary: Deactivate a workflow
- */
 router.post('/:id/deactivate', verifyResourceOwnership('workflows'), async (req, res) => {
     try {
         const workflowResult = await global.db.query(
@@ -300,108 +268,20 @@ router.post('/:id/deactivate', verifyResourceOwnership('workflows'), async (req,
             return res.status(404).json({ error: 'Workflow not found' });
         }
         
-        const n8nWorkflowId = workflowResult.rows[0].n8n_workflow_id;
-        
         const n8n = getN8NService();
-        await n8n.deactivateWorkflow(n8nWorkflowId);
+        await n8n.deactivateWorkflow(workflowResult.rows[0].n8n_workflow_id);
         
         await global.db.query(
-            `UPDATE ${req.schemaName}.workflows 
-             SET is_active = false, updated_at = CURRENT_TIMESTAMP 
-             WHERE id = $1`,
+            `UPDATE ${req.schemaName}.workflows SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
             [req.params.id]
         );
         
         res.json({ message: 'Workflow deactivated successfully' });
     } catch (err) {
-        console.error('Error deactivating workflow:', err);
         res.status(500).json({ error: 'Failed to deactivate workflow' });
     }
 });
 
-/**
- * @swagger
- * /api/workflows/{id}/execute:
- *   post:
- *     summary: Manually execute a workflow
- */
-router.post('/:id/execute', verifyResourceOwnership('workflows'), async (req, res) => {
-    try {
-        const { data } = req.body;
-        
-        const workflowResult = await global.db.query(
-            `SELECT n8n_workflow_id, webhook_url FROM ${req.schemaName}.workflows WHERE id = $1`,
-            [req.params.id]
-        );
-        
-        if (workflowResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Workflow not found' });
-        }
-        
-        const workflow = workflowResult.rows[0];
-        
-        // Execute via N8N
-        const n8n = getN8NService();
-        const execution = await n8n.executeWorkflow(workflow.n8n_workflow_id, data);
-        
-        // Log execution
-        await global.db.query(
-            `INSERT INTO ${req.schemaName}.workflow_executions 
-            (workflow_id, n8n_execution_id, status, input_data)
-            VALUES ($1, $2, $3, $4)`,
-            [req.params.id, execution.id, 'running', JSON.stringify(data)]
-        );
-        
-        // Update workflow execution count
-        await global.db.query(
-            `UPDATE ${req.schemaName}.workflows 
-             SET execution_count = execution_count + 1, 
-                 last_executed = CURRENT_TIMESTAMP 
-             WHERE id = $1`,
-            [req.params.id]
-        );
-        
-        res.json({ 
-            message: 'Workflow execution started',
-            execution_id: execution.id,
-        });
-    } catch (err) {
-        console.error('Error executing workflow:', err);
-        res.status(500).json({ error: 'Failed to execute workflow' });
-    }
-});
-
-/**
- * @swagger
- * /api/workflows/{id}/executions:
- *   get:
- *     summary: Get execution history for a workflow
- */
-router.get('/:id/executions', verifyResourceOwnership('workflows'), async (req, res) => {
-    try {
-        const { limit = 20, offset = 0 } = req.query;
-        
-        const result = await global.db.query(
-            `SELECT * FROM ${req.schemaName}.workflow_executions 
-             WHERE workflow_id = $1 
-             ORDER BY started_at DESC 
-             LIMIT $2 OFFSET $3`,
-            [req.params.id, limit, offset]
-        );
-        
-        res.json({ executions: result.rows });
-    } catch (err) {
-        console.error('Error fetching executions:', err);
-        res.status(500).json({ error: 'Failed to fetch executions' });
-    }
-});
-
-/**
- * @swagger
- * /api/workflows/{id}:
- *   delete:
- *     summary: Delete a workflow
- */
 router.delete('/:id', verifyResourceOwnership('workflows'), async (req, res) => {
     try {
         const workflowResult = await global.db.query(
@@ -413,13 +293,9 @@ router.delete('/:id', verifyResourceOwnership('workflows'), async (req, res) => 
             return res.status(404).json({ error: 'Workflow not found' });
         }
         
-        const n8nWorkflowId = workflowResult.rows[0].n8n_workflow_id;
-        
-        // Delete from N8N
         const n8n = getN8NService();
-        await n8n.deleteWorkflow(n8nWorkflowId);
+        await n8n.deleteWorkflow(workflowResult.rows[0].n8n_workflow_id);
         
-        // Delete from database
         await global.db.query(
             `DELETE FROM ${req.schemaName}.workflows WHERE id = $1`,
             [req.params.id]
@@ -427,10 +303,8 @@ router.delete('/:id', verifyResourceOwnership('workflows'), async (req, res) => 
         
         res.json({ message: 'Workflow deleted successfully' });
     } catch (err) {
-        console.error('Error deleting workflow:', err);
         res.status(500).json({ error: 'Failed to delete workflow' });
     }
 });
-
 
 module.exports = router;

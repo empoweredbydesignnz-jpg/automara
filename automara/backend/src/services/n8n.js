@@ -466,6 +466,24 @@ class N8NService {
     }
     
     /**
+     * Get workflow executions
+     */
+    async getExecutions(workflowId, limit = 20) {
+        try {
+            const response = await this.client.get('/api/v1/executions', {
+                params: {
+                    workflowId,
+                    limit,
+                },
+            });
+            return response.data.data;
+        } catch (err) {
+            console.error('Error fetching executions:', err.response?.data || err.message);
+            return [];
+        }
+    }
+    
+    /**
      * Execute a workflow manually
      */
     async executeWorkflow(workflowId, data = {}) {
@@ -477,6 +495,71 @@ class N8NService {
         } catch (err) {
             console.error('Error executing workflow:', err.response?.data || err.message);
             throw new Error('Failed to execute workflow');
+        }
+    }
+
+    /**
+     * Get or create company folder (tag) in n8n.
+     * @param {string} companyName - The name of the company/tenant.
+     * @returns {string} The ID of the n8n tag/folder.
+     */
+    async getOrCreateCompanyFolder(companyName) {
+        try {
+            console.log(`[N8N] Fetching tags for company: ${companyName}`);
+            const tagsResponse = await this.client.get('/api/v1/tags');
+            
+            const existingFolder = tagsResponse.data.data.find(
+                tag => tag.name === companyName
+            );
+            
+            if (existingFolder) {
+                console.log(`[N8N] Found existing folder (ID: ${existingFolder.id})`);
+                return existingFolder.id;
+            }
+            
+            console.log(`[N8N] Creating new folder for: ${companyName}`);
+            const createResponse = await this.client.post('/api/v1/tags', { name: companyName });
+            
+            console.log(`[N8N] Folder created (ID: ${createResponse.data.data.id})`);
+            return createResponse.data.data.id;
+        } catch (error) {
+            console.error('[N8N] Error managing company folder:', error.response?.data || error.message);
+            throw new Error(`Failed to create company folder: ${error.message}`);
+        }
+    }
+
+    /**
+     * Clones an n8n workflow and assigns it to a folder (tag).
+     * @param {string} workflowId - The ID of the workflow to clone.
+     * @param {string} newName - The name for the cloned workflow.
+     * @param {string} folderId - The ID of the folder (tag) to assign the cloned workflow to.
+     * @returns {object} The data of the newly cloned workflow.
+     */
+    async cloneWorkflowToFolder(workflowId, newName, folderId) {
+        try {
+            console.log(`[N8N] Fetching workflow ${workflowId}`);
+            const workflowResponse = await this.client.get(`/api/v1/workflows/${workflowId}`);
+            
+            const originalWorkflow = workflowResponse.data.data;
+            
+            const clonedWorkflow = {
+                name: newName,
+                nodes: originalWorkflow.nodes,
+                connections: originalWorkflow.connections,
+                settings: originalWorkflow.settings || {},
+                staticData: null,
+                tags: [{ id: folderId }],
+                active: false
+            };
+            
+            console.log(`[N8N] Creating cloned workflow: ${newName}`);
+            const createResponse = await this.client.post('/api/v1/workflows', clonedWorkflow);
+            
+            console.log(`[N8N] Clone created (ID: ${createResponse.data.data.id})`);
+            return createResponse.data.data;
+        } catch (error) {
+            console.error('[N8N] Error cloning workflow:', error.response?.data || error.message);
+            throw new Error(`Failed to clone workflow: ${error.message}`);
         }
     }
 }

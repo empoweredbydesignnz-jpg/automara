@@ -18,6 +18,13 @@ function AutomationsLibrary() {
 
   useEffect(() => {
     fetchWorkflows();
+    
+    // Auto-sync every 10 seconds
+    const syncInterval = setInterval(() => {
+      handleSyncN8N();
+    }, 10000);
+    
+    return () => clearInterval(syncInterval);
   }, []);
 
   const getAuthHeaders = () => {
@@ -65,14 +72,8 @@ function AutomationsLibrary() {
         axios.get('/api/workflows', { headers: getAuthHeaders() }),
       ]);
 
-      const allWorkflows = workflowsResponse.data.workflows || [];
-
-      const libraryTemplates = allWorkflows.filter(
-        (w) => w.is_template === true || w.tenant_id === null
-      );
-      const userWorkflows = allWorkflows.filter(
-        (w) => w.tenant_id === user?.tenantId
-      );
+      const libraryTemplates = templatesResponse.data.templates || [];
+      const userWorkflows = workflowsResponse.data.workflows || [];
 
       setWorkflows(libraryTemplates);
       setMyWorkflows(userWorkflows);
@@ -113,7 +114,7 @@ function AutomationsLibrary() {
     }
   };
 
-  const handleSyncN8N = async () => {
+  const handleSyncN8N = async (showAlert = false) => {
     try {
       setSyncing(true);
       await axios.post(
@@ -121,14 +122,18 @@ function AutomationsLibrary() {
         {},
         { headers: getAuthHeaders() }
       );
-      alert('Workflows synced successfully!');
+      if (showAlert) {
+        alert('Workflows synced successfully!');
+      }
       await fetchWorkflows();
     } catch (error) {
       console.error('Error syncing workflows:', error);
-      alert(
-        'Failed to sync workflows: ' +
-          (error.response?.data?.error || error.message)
-      );
+      if (showAlert) {
+        alert(
+          'Failed to sync workflows: ' +
+            (error.response?.data?.error || error.message)
+        );
+      }
     } finally {
       setSyncing(false);
     }
@@ -147,24 +152,38 @@ function AutomationsLibrary() {
 
       if (response.data.success) {
         alert(
-          `Workflow activated successfully!\n\nName: ${response.data.workflow.name}\nFolder: ${response.data.workflow.folder}`
+          `Workflow Activated Successfully!\n\n` +
+          `Name: ${response.data.workflow.name}\n` +
+          `Folder: ${response.data.workflow.folder}\n\n` +
+          `Your company-specific workflow has been created and is ready to use.`
         );
         await fetchWorkflows();
         setActiveTab('my-workflows');
       }
     } catch (error) {
       console.error('Error activating workflow:', error);
-      alert(
-        'Failed to activate workflow: ' +
-          (error.response?.data?.message || error.message)
-      );
+      
+      // Handle duplicate workflow error
+      if (error.response?.status === 409) {
+        alert(
+          `ℹ️ Workflow Already Activated\n\n` +
+          `This workflow has already been activated for your company.\n` +
+          `Check the "My Workflows" tab to view it.`
+        );
+        setActiveTab('my-workflows');
+      } else {
+        alert(
+          'Failed to activate workflow: ' +
+            (error.response?.data?.error || error.response?.data?.message || error.message)
+        );
+      }
     } finally {
       setActivating(null);
     }
   };
 
-  const handleDeactivateWorkflow = async (workflowId) => {
-    if (!window.confirm('Are you sure you want to deactivate this workflow?'))
+  const handleRemoveWorkflow = async (workflowId) => {
+    if (!window.confirm('Are you sure you want to deactivate this workflow? This will remove it from your workflows and you can reactivate it later from the Library.'))
       return;
 
     try {
@@ -176,7 +195,7 @@ function AutomationsLibrary() {
           headers: getAuthHeaders(),
         }
       );
-      alert('Workflow deactivated successfully!');
+      alert('Workflow deactivated successfully! You can reactivate it from the Library.');
       await fetchWorkflows();
     } catch (error) {
       console.error('Error deactivating workflow:', error);
@@ -247,7 +266,7 @@ function AutomationsLibrary() {
           {/* Sync with n8n button - only visible to global admins */}
           {user?.role === 'global_admin' && (
             <button
-              onClick={handleSyncN8N}
+              onClick={() => handleSyncN8N(true)}
               disabled={syncing}
               className="group px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
@@ -335,7 +354,7 @@ function AutomationsLibrary() {
             <button
               onClick={
                 activeTab === 'library'
-                  ? handleSyncN8N
+                  ? () => handleSyncN8N(true)
                   : () => setActiveTab('library')
               }
               className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all hover:scale-105"
@@ -527,59 +546,35 @@ function AutomationsLibrary() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            fetchWorkflowDetails(workflow);
+                            handleRemoveWorkflow(workflow.id);
                           }}
-                          className="flex-1 px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs rounded-xl border border-slate-700 hover:border-purple-500/40 transition-all flex items-center justify-center gap-1.5"
+                          disabled={activating === workflow.id}
+                          className="flex-1 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded-xl font-semibold border border-red-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                         >
-                          <svg
-                            className="w-3.5 h-3.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 12h14M5 12l4-4m-4 4l4 4"
-                            />
-                          </svg>
-                          Manage
+                          {activating === workflow.id ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-red-300/40 border-t-red-300 rounded-full animate-spin" />
+                              <span>Removing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                              <span>Deactivate</span>
+                            </>
+                          )}
                         </button>
-                        {workflow.active && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeactivateWorkflow(workflow.id);
-                            }}
-                            disabled={activating === workflow.id}
-                            className="flex-1 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs rounded-xl font-semibold border border-blue-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                          >
-                            {activating === workflow.id ? (
-                              <>
-                                <div className="w-3.5 h-3.5 border-2 border-blue-300/40 border-t-blue-300 rounded-full animate-spin" />
-                                <span>Pausing...</span>
-                              </>
-                            ) : (
-                              <>
-                                <svg
-                                  className="w-3.5 h-3.5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M10 9v6m4-6v6"
-                                  />
-                                </svg>
-                                <span>Pause</span>
-                              </>
-                            )}
-                          </button>
-                        )}
                       </>
                     )}
                   </div>

@@ -425,23 +425,21 @@ app.get('/api/roles', async (req, res) => {
 // User routes (handles GET, POST, PATCH, DELETE)
 app.use('/api/users', userRoutes(pool));
 
-// Workflows API endpoints
+// Workflows API endpoints - returns activated workflows for tenant
 app.get('/api/workflows', filterTenantsByRole, async (req, res) => {
   try {
     const tenantId = req.tenantId;
-    
-    let query = 'SELECT * FROM workflows';
-    let params = [];
-    
-    // Filter by tenant unless global admin
-    if (req.userRole !== 'global_admin' && tenantId) {
-      query += ' WHERE tenant_id = $1';
-      params = [tenantId];
+
+    // If no tenantId (e.g., global_admin), return empty array
+    if (!tenantId) {
+      return res.json({ workflows: [] });
     }
-    
-    query += ' ORDER BY created_at DESC';
-    
-    const result = await pool.query(query, params);
+
+    const query = `SELECT * FROM workflows
+                   WHERE tenant_id = $1 AND is_template = false AND active = true
+                   ORDER BY created_at DESC`;
+
+    const result = await pool.query(query, [tenantId]);
     res.json({ workflows: result.rows });
   } catch (error) {
     console.error('Error fetching workflows:', error);
@@ -451,22 +449,13 @@ app.get('/api/workflows', filterTenantsByRole, async (req, res) => {
 
 app.get('/api/workflows/templates', filterTenantsByRole, async (req, res) => {
   try {
-    res.json({ 
-      templates: [
-        {
-          id: 1,
-          name: 'Email Automation',
-          description: 'Automated email workflows',
-          category: 'Communication'
-        },
-        {
-          id: 2,
-          name: 'Data Sync',
-          description: 'Sync data between systems',
-          category: 'Integration'
-        }
-      ] 
-    });
+    const result = await pool.query(
+      `SELECT id, n8n_workflow_id, name, n8n_data, active, created_at, updated_at
+       FROM workflows
+       WHERE is_template = true AND tenant_id IS NULL
+       ORDER BY created_at DESC`
+    );
+    res.json({ templates: result.rows });
   } catch (error) {
     console.error('Error fetching templates:', error);
     res.status(500).json({ error: error.message });
@@ -522,16 +511,14 @@ app.post('/api/workflows/sync', filterTenantsByRole, async (req, res) => {
     
     console.log(`Found ${allWorkflows.length} total workflows, ${workflows.length} in library folder`);
     
-    const tenantId = req.tenantId || null;
-    
-    // Store/update workflows in database
+    // Store/update workflows in database as templates
     for (const wf of workflows) {
       await pool.query(
-        `INSERT INTO workflows (n8n_workflow_id, tenant_id, name, active, n8n_data, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
-         ON CONFLICT (n8n_workflow_id) 
-         DO UPDATE SET name = $3, active = $4, n8n_data = $5, tenant_id = $2, updated_at = NOW()`,
-        [wf.id, tenantId, wf.name, wf.active, JSON.stringify(wf)]
+        `INSERT INTO workflows (n8n_workflow_id, tenant_id, name, active, n8n_data, is_template, updated_at, created_at)
+         VALUES ($1, NULL, $2, $3, $4, true, NOW(), NOW())
+         ON CONFLICT (n8n_workflow_id)
+         DO UPDATE SET name = $2, active = $3, n8n_data = $4, is_template = true, tenant_id = NULL, updated_at = NOW()`,
+        [wf.id, wf.name, wf.active, JSON.stringify(wf)]
       );
     }
     

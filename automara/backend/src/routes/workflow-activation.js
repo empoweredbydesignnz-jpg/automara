@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
+const { getN8NService } = require('../services/n8n');
 const { Pool } = require('pg');
 
 // Database connection - same config as index.js
@@ -11,99 +11,14 @@ const pool = new Pool({
   user: process.env.DB_USER || 'automara',
   password: process.env.DB_PASSWORD
 });
-
 // N8N Configuration
-const N8N_API_URL = process.env.N8N_API_URL || 'http://n8n:5678/api/v1';
-const N8N_API_KEY = process.env.N8N_API_KEY;
-
-// Helper: Get or create company folder in n8n
-async function getOrCreateCompanyFolder(companyName) {
-  try {
-    console.log(`[N8N] Fetching tags for company: ${companyName}`);
-    const tagsResponse = await axios.get(`${N8N_API_URL}/tags`, {
-      headers: { 'X-N8N-API-KEY': N8N_API_KEY },
-      timeout: 10000
-    });
-
-    const existingFolder = tagsResponse.data.data.find(
-      tag => tag.name === companyName
-    );
-
-    if (existingFolder) {
-      console.log(`[N8N] Found existing folder (ID: ${existingFolder.id})`);
-      return existingFolder.id;
-    }
-
-    console.log(`[N8N] Creating new folder for: ${companyName}`);
-    const createResponse = await axios.post(
-      `${N8N_API_URL}/tags`,
-      { name: companyName },
-      {
-        headers: {
-          'X-N8N-API-KEY': N8N_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      }
-    );
-
-    console.log(`[N8N] Folder created (ID: ${createResponse.data.data.id})`);
-    return createResponse.data.data.id;
-  } catch (error) {
-    console.error('[N8N] Error managing company folder:', error.message);
-    throw new Error(`Failed to create company folder: ${error.message}`);
-  }
-}
-
-// Helper: Clone workflow in n8n
-async function cloneWorkflowToFolder(workflowId, newName, folderId) {
-  try {
-    console.log(`[N8N] Fetching workflow ${workflowId}`);
-    const workflowResponse = await axios.get(
-      `${N8N_API_URL}/workflows/${workflowId}`,
-      { 
-        headers: { 'X-N8N-API-KEY': N8N_API_KEY },
-        timeout: 10000
-      }
-    );
-
-    const originalWorkflow = workflowResponse.data.data;
-
-    const clonedWorkflow = {
-      name: newName,
-      nodes: originalWorkflow.nodes,
-      connections: originalWorkflow.connections,
-      settings: originalWorkflow.settings || {},
-      staticData: null,
-      tags: [{ id: folderId }],
-      active: false
-    };
-
-    console.log(`[N8N] Creating cloned workflow: ${newName}`);
-    const createResponse = await axios.post(
-      `${N8N_API_URL}/workflows`,
-      clonedWorkflow,
-      {
-        headers: {
-          'X-N8N-API-KEY': N8N_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        timeout: 15000
-      }
-    );
-
-    console.log(`[N8N] Clone created (ID: ${createResponse.data.data.id})`);
-    return createResponse.data.data;
-  } catch (error) {
-    console.error('[N8N] Error cloning workflow:', error.message);
-    throw new Error(`Failed to clone workflow: ${error.message}`);
-  }
-}
+// N8N_API_URL and N8N_API_KEY are now handled by N8NService
 
 // POST /api/workflows/:id/activate
 router.post('/workflows/:id/activate', async (req, res) => {
   console.log('=== WORKFLOW ACTIVATION STARTED ===');
   const startTime = Date.now();
+  const n8n = getN8NService();
   
   try {
     const { id } = req.params;
@@ -157,11 +72,11 @@ router.post('/workflows/:id/activate', async (req, res) => {
     console.log(`[DB] Found workflow: ${workflow.name} (n8n: ${workflow.n8n_workflow_id})`);
 
     // Get or create company folder
-    const folderId = await getOrCreateCompanyFolder(companyName);
+    const folderId = await n8n.getOrCreateCompanyFolder(companyName);
 
     // Clone workflow
     const clonedWorkflowName = `${companyName} - ${workflow.name}`;
-    const clonedWorkflow = await cloneWorkflowToFolder(
+    const clonedWorkflow = await n8n.cloneWorkflowToFolder(
       workflow.n8n_workflow_id,
       clonedWorkflowName,
       folderId
@@ -199,17 +114,7 @@ router.post('/workflows/:id/activate', async (req, res) => {
 
     // Activate in n8n
     console.log(`[N8N] Activating workflow...`);
-    await axios.patch(
-      `${N8N_API_URL}/workflows/${clonedWorkflow.id}`,
-      { active: true },
-      {
-        headers: {
-          'X-N8N-API-KEY': N8N_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      }
-    );
+    await n8n.activateWorkflow(clonedWorkflow.id);
     console.log(`[N8N] Workflow activated`);
 
     // Log activation
@@ -293,17 +198,7 @@ router.post('/workflows/:id/deactivate', async (req, res) => {
 
     // Deactivate in n8n
     console.log(`[N8N] Deactivating workflow ${workflow.n8n_workflow_id}...`);
-    await axios.patch(
-      `${N8N_API_URL}/workflows/${workflow.n8n_workflow_id}`,
-      { active: false },
-      {
-        headers: {
-          'X-N8N-API-KEY': N8N_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      }
-    );
+    await n8n.deactivateWorkflow(workflow.n8n_workflow_id);
 
     // Update database
     console.log(`[DB] Updating workflow status...`);
