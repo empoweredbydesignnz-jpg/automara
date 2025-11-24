@@ -60,7 +60,8 @@ router.post('/sync', async (req, res) => {
 router.get('/templates', async (req, res) => {
     try {
         const result = await global.db.query(
-            `SELECT id, n8n_workflow_id, name, n8n_data, active, created_at, updated_at
+            `SELECT id, n8n_workflow_id, name, n8n_data, active, created_at, updated_at,
+                    manual_time_minutes, n8n_time_seconds
              FROM public.workflows
              WHERE is_template = true AND tenant_id IS NULL
              ORDER BY created_at DESC`
@@ -82,7 +83,8 @@ router.get('/', async (req, res) => {
 
         const result = await global.db.query(
             `SELECT id, n8n_workflow_id, name, n8n_data, active, is_template, tenant_id,
-                    created_at, updated_at, cloned_at, folder_name, template_id
+                    created_at, updated_at, cloned_at, folder_name, template_id,
+                    manual_time_minutes, n8n_time_seconds
              FROM public.workflows
              WHERE tenant_id = $1 AND is_template = false
              ORDER BY created_at DESC`,
@@ -288,22 +290,57 @@ router.delete('/:id', verifyResourceOwnership('workflows'), async (req, res) => 
             `SELECT n8n_workflow_id FROM ${req.schemaName}.workflows WHERE id = $1`,
             [req.params.id]
         );
-        
+
         if (workflowResult.rows.length === 0) {
             return res.status(404).json({ error: 'Workflow not found' });
         }
-        
+
         const n8n = getN8NService();
         await n8n.deleteWorkflow(workflowResult.rows[0].n8n_workflow_id);
-        
+
         await global.db.query(
             `DELETE FROM ${req.schemaName}.workflows WHERE id = $1`,
             [req.params.id]
         );
-        
+
         res.json({ message: 'Workflow deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: 'Failed to delete workflow' });
+    }
+});
+
+// Update time estimates for a workflow (admin only)
+router.patch('/:id/time-estimates', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { manual_time_minutes, n8n_time_seconds } = req.body;
+        const userRole = req.headers['x-user-role'];
+
+        // Only global_admin can update time estimates
+        if (userRole !== 'global_admin' && userRole !== 'admin') {
+            return res.status(403).json({ error: 'Only administrators can update time estimates' });
+        }
+
+        const result = await global.db.query(
+            `UPDATE public.workflows
+             SET manual_time_minutes = $1, n8n_time_seconds = $2, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3
+             RETURNING id, name, manual_time_minutes, n8n_time_seconds`,
+            [manual_time_minutes, n8n_time_seconds, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Time estimates updated successfully',
+            workflow: result.rows[0]
+        });
+    } catch (err) {
+        console.error('Error updating time estimates:', err);
+        res.status(500).json({ error: 'Failed to update time estimates' });
     }
 });
 

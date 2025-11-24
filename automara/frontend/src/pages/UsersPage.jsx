@@ -398,7 +398,7 @@ function UsersPage() {
       case 'msp_admin':
         return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
       case 'client_admin':
-        return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+        return 'bg-theme-primary/10 text-theme-accent border-theme-primary/20';
       case 'client_user':
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
       default:
@@ -433,8 +433,8 @@ function UsersPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 border-4 border-purple-500/30 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 border-4 border-theme-primary/30 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-transparent border-t-theme-primary rounded-full animate-spin"></div>
           </div>
           <p className="text-slate-400 text-lg font-medium">Loading users...</p>
         </div>
@@ -447,7 +447,7 @@ function UsersPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent mb-3">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-theme-accent via-theme-accent-alt to-theme-accent bg-clip-text text-transparent mb-3">
             User Management
           </h1>
           <p className="text-slate-400 text-lg">Manage user roles and permissions</p>
@@ -480,7 +480,7 @@ function UsersPage() {
             placeholder="Search users by name, email, or tenant..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-4 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+            className="w-full pl-12 pr-4 py-4 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
           />
         </div>
 
@@ -509,7 +509,7 @@ function UsersPage() {
                     <td className="p-6">
                       <div className="flex items-center gap-4">
                         <div className="relative">
-                          <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-purple-500/25">
+                          <div className="w-12 h-12 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-theme-primary/25">
                             {getInitials(user)}
                           </div>
                           <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900 ${
@@ -561,7 +561,7 @@ function UsersPage() {
                     <td className="p-6">
                       <button
                         onClick={() => handleEditUser(user)}
-                        className="group px-4 py-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg font-medium transition-all hover:bg-purple-500/20 flex items-center gap-2"
+                        className="group px-4 py-2.5 bg-theme-primary/10 text-theme-accent border border-theme-primary/20 rounded-lg font-medium transition-all hover:bg-theme-primary/20 flex items-center gap-2"
                       >
                         <svg className="w-4 h-4 flex items-center justify-center" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2h-7m-1 7l-4-4m0 0l4 4m0-4h5" />
@@ -576,7 +576,7 @@ function UsersPage() {
 
             {filteredUsers.length === 0 && (
               <div className="text-center py-20">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-2xl flex items-center justify-center">
                   <svg className="w-10 h-10 flex items-center justify-center" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
@@ -596,7 +596,7 @@ function UsersPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
           <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 backdrop-blur-sm rounded-xl border border-slate-800 p-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center border border-purple-500/20">
+              <div className="w-12 h-12 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-xl flex items-center justify-center border border-theme-primary/20">
                 <svg className="w-6 h-6 flex items-center justify-center" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
@@ -645,10 +645,10 @@ function UsersPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col">
             <div className="relative p-8 border-b border-slate-800">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-theme-primary-dark/10 to-theme-secondary-dark/10"></div>
               <div className="relative flex items-start justify-between">
                 <div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-theme-accent to-theme-accent-alt bg-clip-text text-transparent mb-2">
                     Edit User
                   </h2>
                   <p className="text-slate-400">Update user information and settings</p>
@@ -677,7 +677,7 @@ function UsersPage() {
                         value={editUser.first_name}
                         onChange={(e) => setEditUser({...editUser, first_name: e.target.value})}
                         placeholder="Enter first name"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         required
                       />
                     </div>
@@ -688,7 +688,7 @@ function UsersPage() {
                         value={editUser.last_name}
                         onChange={(e) => setEditUser({...editUser, last_name: e.target.value})}
                         placeholder="Enter last name"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         required
                       />
                     </div>
@@ -699,7 +699,7 @@ function UsersPage() {
                         value={editUser.email}
                         onChange={(e) => setEditUser({...editUser, email: e.target.value})}
                         placeholder="Enter email address"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         required
                       />
                     </div>
@@ -715,7 +715,7 @@ function UsersPage() {
                       <select
                         value={editUser.role}
                         onChange={(e) => setEditUser({...editUser, role: e.target.value})}
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         required
                       >
                         {roles.map((role) => (
@@ -732,7 +732,7 @@ function UsersPage() {
                         value={editUser.tenant_name}
                         onChange={(e) => setEditUser({...editUser, tenant_name: e.target.value})}
                         placeholder="Enter tenant name"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                       />
                     </div>
                   </div>
@@ -750,7 +750,7 @@ function UsersPage() {
                         value={editUser.password}
                         onChange={(e) => setEditUser({...editUser, password: e.target.value})}
                         placeholder="Enter new password (minimum 8 characters)"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         minLength={8}
                       />
                       <p className="text-slate-400 text-xs mt-1 text-center">Password must be at least 8 characters long</p>
@@ -762,7 +762,7 @@ function UsersPage() {
                         value={editUser.password_confirmation}
                         onChange={(e) => setEditUser({...editUser, password_confirmation: e.target.value})}
                         placeholder="Confirm new password"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         minLength={8}
                       />
                     </div>
@@ -773,7 +773,7 @@ function UsersPage() {
                 <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
                   <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 text-center">Current User Information</h3>
                   <div className="flex flex-col items-center gap-4 mb-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-purple-500/25">
+                    <div className="w-16 h-16 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-theme-primary/25">
                       {getInitials(selectedUser)}
                     </div>
                     <div className="text-center">
@@ -810,7 +810,7 @@ function UsersPage() {
                   <button
                     type="submit"
                     disabled={saving || (editUser.password && editUser.password !== editUser.password_confirmation) || (editUser.password && editUser.password.length < 8)}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark hover:from-theme-primary hover:to-theme-secondary rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving ? (
                       <div className="flex items-center justify-center gap-2">

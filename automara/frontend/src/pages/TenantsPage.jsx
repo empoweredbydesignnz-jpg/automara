@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { plans, ADDITIONAL_AUTOMATION_PRICE } from '../context/BillingContext';
 
 function TenantsPage() {
   const [tenants, setTenants] = useState([]);
@@ -8,6 +9,24 @@ function TenantsPage() {
   const [showManageModal, setShowManageModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [showBillingDetails, setShowBillingDetails] = useState(false);
+
+  // Get current user for role check
+  const user = JSON.parse(localStorage.getItem('user'));
+
+  // Mock tenant billing data (in production, this would come from the backend)
+  const getTenantBilling = (tenantId) => {
+    // Simulated billing data per tenant
+    const billingData = {
+      plan: 'starter',
+      purchases: [
+        { id: 1, type: 'plan', name: 'Automara Starter', amount: 29, date: '2025-01-15' },
+        { id: 2, type: 'automation', name: 'Email Automation', amount: 10, date: '2025-01-20' },
+        { id: 3, type: 'automation', name: 'Slack Integration', amount: 10, date: '2025-02-01' },
+      ]
+    };
+    return billingData;
+  };
   const [newTenant, setNewTenant] = useState({
     name: '',
     domain: '',
@@ -177,8 +196,8 @@ function TenantsPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 border-4 border-purple-500/30 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 border-4 border-theme-primary/30 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-transparent border-t-theme-primary rounded-full animate-spin"></div>
           </div>
           <p className="text-slate-400 text-lg font-medium">Loading tenants...</p>
         </div>
@@ -187,20 +206,20 @@ function TenantsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen text-white p-4 md:p-8">
+      <div className="max-w-7xl mx-auto animate-fade-in">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12">
           <div>
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent mb-2">
+            <h1 className="text-4xl md:text-5xl font-bold text-gradient mb-2 tracking-tight">
               Tenants
             </h1>
-            <p className="text-slate-400 text-lg">Manage your multi-tenant organizations</p>
+            <p className="text-slate-400 text-lg tracking-wide">Manage your multi-tenant organizations</p>
           </div>
-          
+
           <button
             onClick={() => setShowAddModal(true)}
-            className="group px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-105 flex items-center gap-3"
+            className="group px-6 py-3.5 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all duration-300 hover:scale-105 btn-premium flex items-center gap-3"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -211,9 +230,9 @@ function TenantsPage() {
 
         {/* Tenants Grid */}
         {tenants.length === 0 ? (
-          <div className="text-center py-20 bg-slate-900/30 backdrop-blur-sm rounded-2xl border border-slate-800">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl flex items-center justify-center">
-              <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-20 glass-card rounded-2xl">
+            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-2xl flex items-center justify-center">
+              <svg className="w-10 h-10 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
@@ -221,7 +240,7 @@ function TenantsPage() {
             <p className="text-slate-400 mb-8 max-w-md mx-auto">Get started by adding your first tenant organization</p>
             <button 
               onClick={() => setShowAddModal(true)}
-              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all hover:scale-105"
+              className="px-8 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all hover:scale-105"
             >
               Add Your First Tenant
             </button>
@@ -229,25 +248,25 @@ function TenantsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tenants.map((tenant) => (
-              <div 
+              <div
                 key={tenant.id}
-                className="group relative bg-gradient-to-br from-slate-900/50 to-slate-900/30 backdrop-blur-sm rounded-2xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 overflow-hidden"
+                className="group relative glass-card rounded-2xl hover:border-theme-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-theme-primary/20 hover:-translate-y-1 overflow-hidden"
               >
                 {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-600/0 via-purple-600/0 to-pink-600/0 group-hover:from-purple-600/5 group-hover:to-pink-600/5 transition-all duration-300"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-dark/0 via-theme-primary-dark/0 to-theme-secondary-dark/0 group-hover:from-theme-primary-dark/5 group-hover:to-theme-secondary-dark/5 transition-all duration-300"></div>
                 
                 <div className="relative p-6">
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center border border-purple-500/20">
-                          <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="w-12 h-12 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-xl flex items-center justify-center border border-theme-primary/20">
+                          <svg className="w-6 h-6 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                           </svg>
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold text-white group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-purple-400 group-hover:to-pink-400 group-hover:bg-clip-text transition-all">
+                          <h3 className="text-xl font-bold text-white group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-theme-accent group-hover:to-theme-accent-alt group-hover:bg-clip-text transition-all">
                             {tenant.name}
                           </h3>
                           <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
@@ -297,7 +316,7 @@ function TenantsPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleManage(tenant)}
-                      className="px-4 py-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg font-medium transition-all hover:bg-purple-500/20 flex items-center justify-center gap-2"
+                      className="px-4 py-2.5 bg-theme-primary/10 text-theme-accent border border-theme-primary/20 rounded-lg font-medium transition-all hover:bg-theme-primary/20 flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -327,13 +346,13 @@ function TenantsPage() {
 
       {/* Add Tenant Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-2xl max-w-2xl w-full overflow-hidden">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-card rounded-2xl premium-shadow max-w-2xl w-full overflow-hidden animate-scale-in">
             <div className="relative p-8 border-b border-slate-800">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-theme-primary-dark/10 to-theme-secondary-dark/10"></div>
               <div className="relative flex items-start justify-between">
                 <div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-theme-accent to-theme-accent-alt bg-clip-text text-transparent mb-2">
                     Add New Tenant
                   </h2>
                   <p className="text-slate-400">Create a new tenant organization</p>
@@ -358,7 +377,7 @@ function TenantsPage() {
                   onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
                   placeholder="Company Name"
                   required
-                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                 />
               </div>
 
@@ -370,7 +389,7 @@ function TenantsPage() {
                   onChange={(e) => setNewTenant({ ...newTenant, domain: e.target.value })}
                   placeholder="company.automara.com"
                   required
-                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                 />
               </div>
 
@@ -382,7 +401,7 @@ function TenantsPage() {
                   onChange={(e) => setNewTenant({ ...newTenant, owner_email: e.target.value })}
                   placeholder="admin@company.com"
                   required
-                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                 />
               </div>
 
@@ -396,7 +415,7 @@ function TenantsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark hover:from-theme-primary hover:to-theme-secondary rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all"
                 >
                   Create Tenant
                 </button>
@@ -408,8 +427,8 @@ function TenantsPage() {
 
       {/* Add Sub-Tenant Modal */}
       {showSubTenantModal && parentTenant && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-2xl max-w-2xl w-full overflow-hidden">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-card rounded-2xl premium-shadow max-w-2xl w-full overflow-hidden animate-scale-in">
             <div className="relative p-8 border-b border-slate-800">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-cyan-600/10"></div>
               <div className="relative flex items-start justify-between">
@@ -489,13 +508,13 @@ function TenantsPage() {
 
       {/* Manage Tenant Modal */}
       {showManageModal && selectedTenant && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-2xl max-w-2xl w-full my-8 overflow-hidden">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="glass-card rounded-2xl premium-shadow max-w-2xl w-full my-8 overflow-hidden animate-scale-in">
             <div className="relative p-8 border-b border-slate-800">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-theme-primary-dark/10 to-theme-secondary-dark/10"></div>
               <div className="relative flex items-start justify-between">
                 <div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-theme-accent to-theme-accent-alt bg-clip-text text-transparent mb-2">
                     Manage Tenant
                   </h2>
                   <p className="text-slate-400">{selectedTenant.name}</p>
@@ -515,8 +534,8 @@ function TenantsPage() {
               {/* Tenant Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-lg flex items-center justify-center border border-purple-500/20">
-                    <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-8 h-8 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-lg flex items-center justify-center border border-theme-primary/20">
+                    <svg className="w-4 h-4 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
@@ -529,7 +548,7 @@ function TenantsPage() {
                     type="text"
                     value={selectedTenant.name}
                     onChange={(e) => setSelectedTenant({...selectedTenant, name: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                   />
                 </div>
 
@@ -539,7 +558,7 @@ function TenantsPage() {
                     type="text"
                     value={selectedTenant.domain}
                     onChange={(e) => setSelectedTenant({...selectedTenant, domain: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                   />
                 </div>
 
@@ -549,7 +568,7 @@ function TenantsPage() {
                     type="email"
                     value={selectedTenant.owner_email}
                     onChange={(e) => setSelectedTenant({...selectedTenant, owner_email: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                   />
                 </div>
               </div>
@@ -617,6 +636,75 @@ function TenantsPage() {
                 </div>
               )}
 
+              {/* Billing Management - Only for global_admin */}
+              {user?.role === 'global_admin' && (
+                <div className="border-t border-slate-800 pt-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-amber-600/20 to-orange-600/20 rounded-lg flex items-center justify-center border border-amber-500/20">
+                      <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                    </div>
+                    Billing & Plan
+                  </h3>
+
+                  {/* Plan Selection */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-400 mb-2">Current Plan</label>
+                    <select
+                      value={selectedTenant.billing_plan || 'starter'}
+                      onChange={(e) => setSelectedTenant({...selectedTenant, billing_plan: e.target.value})}
+                      className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
+                    >
+                      {Object.entries(plans).map(([key, plan]) => (
+                        <option key={key} value={key}>
+                          {plan.name} - ${plan.price}/mo ({plan.automationLimit} automations)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* View Billing History Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowBillingDetails(!showBillingDetails)}
+                    className="w-full px-4 py-3 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl font-medium transition-all hover:bg-amber-500/20 flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    {showBillingDetails ? 'Hide' : 'View'} Billing History
+                  </button>
+
+                  {/* Billing Details */}
+                  {showBillingDetails && (
+                    <div className="mt-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                      <h4 className="text-sm font-semibold text-white mb-3">Purchase History</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {getTenantBilling(selectedTenant.id).purchases.map((purchase) => (
+                          <div key={purchase.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                            <div>
+                              <div className="text-sm font-medium text-white">{purchase.name}</div>
+                              <div className="text-xs text-slate-400">{purchase.date}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-bold text-theme-accent">${purchase.amount}</div>
+                              <div className="text-xs text-slate-500">/month</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-slate-700 flex items-center justify-between">
+                        <span className="text-sm text-slate-400">Total Monthly</span>
+                        <span className="text-lg font-bold text-white">
+                          ${getTenantBilling(selectedTenant.id).purchases.reduce((sum, p) => sum + p.amount, 0)}/mo
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex justify-between pt-6 border-t border-slate-800">
                 <button
@@ -643,7 +731,7 @@ function TenantsPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all disabled:opacity-50 flex items-center gap-2"
+                    className="px-6 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark hover:from-theme-primary hover:to-theme-secondary rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all disabled:opacity-50 flex items-center gap-2"
                   >
                     {saving ? (
                       <>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useTheme, themes } from '../context/ThemeContext';
 
 function SettingsPage({ user }) {
   const [activeTab, setActiveTab] = useState('profile');
+  const { currentTheme, setCurrentTheme, darkMode, setDarkMode } = useTheme();
   const [profile, setProfile] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -11,18 +13,27 @@ function SettingsPage({ user }) {
   const [successMessage, setSuccessMessage] = useState('');
 
   const tabs = [
-    { 
-      id: 'profile', 
-      name: 'Profile', 
+    {
+      id: 'profile',
+      name: 'Profile',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       )
     },
-    { 
-      id: 'security', 
-      name: 'Security', 
+    {
+      id: 'appearance',
+      name: 'Appearance',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+        </svg>
+      )
+    },
+    {
+      id: 'security',
+      name: 'Security',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -72,12 +83,18 @@ function SettingsPage({ user }) {
     return name.charAt(0).toUpperCase();
   };
 
+  const handleThemeChange = (themeKey) => {
+    setCurrentTheme(themeKey);
+    setSuccessMessage('Theme updated successfully!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent mb-3">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-theme-accent via-theme-accent-alt to-theme-accent bg-clip-text text-transparent mb-3">
             Settings
           </h1>
           <p className="text-slate-400 text-lg">Manage your account settings and preferences</p>
@@ -106,7 +123,7 @@ function SettingsPage({ user }) {
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                       activeTab === tab.id
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+                        ? 'bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark text-white shadow-lg shadow-theme-primary/25'
                         : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
                     }`}
                   >
@@ -130,8 +147,8 @@ function SettingsPage({ user }) {
             {activeTab === 'profile' && (
               <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 backdrop-blur-sm rounded-2xl border border-slate-800 p-8">
                 <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-lg flex items-center justify-center border border-purple-500/20">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-10 h-10 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-lg flex items-center justify-center border border-theme-primary/20">
+                    <svg className="w-5 h-5 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
@@ -142,7 +159,7 @@ function SettingsPage({ user }) {
                   {/* Avatar Section */}
                   <div className="flex items-center gap-6 p-6 bg-slate-900/50 rounded-xl border border-slate-800">
                     <div className="relative">
-                      <div className="w-24 h-24 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-xl shadow-purple-500/25">
+                      <div className="w-24 h-24 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-xl shadow-theme-primary/25">
                         {getInitials(profile.name)}
                       </div>
                       <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-emerald-400 rounded-lg flex items-center justify-center border-4 border-slate-900">
@@ -154,7 +171,7 @@ function SettingsPage({ user }) {
                     <div>
                       <button 
                         type="button" 
-                        className="px-6 py-3 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-xl font-semibold transition-all hover:bg-purple-500/20 flex items-center gap-2 mb-2"
+                        className="px-6 py-3 bg-theme-primary/10 text-theme-accent border border-theme-primary/20 rounded-xl font-semibold transition-all hover:bg-theme-primary/20 flex items-center gap-2 mb-2"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -176,7 +193,7 @@ function SettingsPage({ user }) {
                         value={profile.name}
                         onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                         disabled={loading}
-                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
 
@@ -189,7 +206,7 @@ function SettingsPage({ user }) {
                         value={profile.email}
                         onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                         disabled={loading}
-                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
 
@@ -231,7 +248,7 @@ function SettingsPage({ user }) {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-6 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark hover:from-theme-primary hover:to-theme-secondary rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {loading ? (
                         <>
@@ -252,6 +269,115 @@ function SettingsPage({ user }) {
               </div>
             )}
 
+            {/* Appearance Tab */}
+            {activeTab === 'appearance' && (
+              <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 backdrop-blur-sm rounded-2xl border border-slate-800 p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-lg flex items-center justify-center border border-theme-primary/20">
+                    <svg className="w-5 h-5 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                    </svg>
+                  </div>
+                  <h2 className="text-3xl font-bold text-white">Appearance</h2>
+                </div>
+
+                <div className="space-y-8">
+                  {/* Dark/Light Mode Toggle */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-4">Mode</h3>
+                    <p className="text-slate-400 mb-6">Switch between dark and light mode</p>
+
+                    <div className="flex items-center justify-between p-6 bg-slate-900/50 rounded-xl border border-slate-800">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-xl flex items-center justify-center border border-theme-primary/20">
+                          {darkMode ? (
+                            <svg className="w-6 h-6 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-6 h-6 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-white font-semibold text-lg mb-1">
+                            {darkMode ? 'Dark Mode' : 'Light Mode'}
+                          </div>
+                          <div className="text-sm text-slate-400">
+                            {darkMode ? 'Easy on the eyes in low light' : 'Bright and clear for daytime'}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setDarkMode(!darkMode);
+                          setSuccessMessage(`Switched to ${!darkMode ? 'dark' : 'light'} mode`);
+                          setTimeout(() => setSuccessMessage(''), 3000);
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all ${
+                          darkMode ? 'bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark' : 'bg-slate-600'
+                        }`}
+                      >
+                        <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-lg ${
+                          darkMode ? 'translate-x-7' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Color Theme Selection */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-4">Color Theme</h3>
+                    <p className="text-slate-400 mb-6">Select a color theme for the interface</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {Object.entries(themes).map(([key, theme]) => (
+                        <button
+                          key={key}
+                          onClick={() => handleThemeChange(key)}
+                          className={`group relative p-4 rounded-xl border-2 transition-all duration-300 ${
+                            currentTheme === key
+                              ? 'border-purple-500 bg-theme-primary/10'
+                              : 'border-slate-700 hover:border-slate-600 bg-slate-900/50'
+                          }`}
+                        >
+                          {currentTheme === key && (
+                            <div className="absolute top-2 right-2 w-6 h-6 bg-theme-primary rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+
+                          {/* Color Preview */}
+                          <div className="flex gap-2 mb-3">
+                            <div
+                              className="w-8 h-8 rounded-lg"
+                              style={{ backgroundColor: `rgb(${theme.colors.primary})` }}
+                            />
+                            <div
+                              className="w-8 h-8 rounded-lg"
+                              style={{ backgroundColor: `rgb(${theme.colors.secondary})` }}
+                            />
+                            <div
+                              className="w-8 h-8 rounded-lg"
+                              style={{ backgroundColor: `rgb(${theme.colors.accent})` }}
+                            />
+                          </div>
+
+                          <div className="text-left">
+                            <div className="font-semibold text-white mb-1">{theme.name}</div>
+                            <div className="text-sm text-slate-400">{theme.description}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Security Tab */}
             {activeTab === 'security' && (
               <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 backdrop-blur-sm rounded-2xl border border-slate-800 p-8">
@@ -267,7 +393,7 @@ function SettingsPage({ user }) {
                 <div className="space-y-6">
                   <div className="p-6 bg-slate-900/50 rounded-xl border border-slate-800">
                     <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                       </svg>
                       Change Password
@@ -280,7 +406,7 @@ function SettingsPage({ user }) {
                         <input
                           type="password"
                           placeholder="Enter current password"
-                          className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         />
                       </div>
                       <div>
@@ -290,7 +416,7 @@ function SettingsPage({ user }) {
                         <input
                           type="password"
                           placeholder="Enter new password"
-                          className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         />
                       </div>
                       <div>
@@ -300,11 +426,11 @@ function SettingsPage({ user }) {
                         <input
                           type="password"
                           placeholder="Confirm new password"
-                          className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          className="w-full px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-theme-primary/50 focus:ring-2 focus:ring-theme-primary/20 transition-all"
                         />
                       </div>
                     </div>
-                    <button className="mt-6 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all flex items-center gap-2">
+                    <button className="mt-6 px-6 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark hover:from-theme-primary hover:to-theme-secondary rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all flex items-center gap-2">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -380,7 +506,7 @@ function SettingsPage({ user }) {
                   ].map((item, index) => (
                     <div key={index} className="group flex items-center justify-between p-6 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-slate-700 transition-all">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center border border-purple-500/20 text-purple-400">
+                        <div className="w-12 h-12 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-xl flex items-center justify-center border border-theme-primary/20 text-theme-accent">
                           {item.icon}
                         </div>
                         <div>
@@ -389,7 +515,7 @@ function SettingsPage({ user }) {
                         </div>
                       </div>
                       <button className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all ${
-                        item.enabled ? 'bg-gradient-to-r from-purple-600 to-pink-600' : 'bg-slate-700'
+                        item.enabled ? 'bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark' : 'bg-slate-700'
                       }`}>
                         <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-lg ${
                           item.enabled ? 'translate-x-7' : 'translate-x-1'
@@ -405,8 +531,8 @@ function SettingsPage({ user }) {
             {activeTab === 'users' && user?.role === 'admin' && (
               <div className="bg-gradient-to-br from-slate-900/50 to-slate-900/30 backdrop-blur-sm rounded-2xl border border-slate-800 p-8">
                 <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-lg flex items-center justify-center border border-purple-500/20">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-10 h-10 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-lg flex items-center justify-center border border-theme-primary/20">
+                    <svg className="w-5 h-5 text-theme-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                   </div>
@@ -425,7 +551,7 @@ function SettingsPage({ user }) {
                     </h3>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-purple-500/25">
+                        <div className="w-12 h-12 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-theme-primary/25">
                           {getInitials(user?.name || user?.email || 'A')}
                         </div>
                         <div>
@@ -433,7 +559,7 @@ function SettingsPage({ user }) {
                           <div className="text-sm text-slate-400">Role: Administrator</div>
                         </div>
                       </div>
-                      <span className="px-4 py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-sm font-bold">
+                      <span className="px-4 py-2 bg-theme-primary/10 text-theme-accent border border-theme-primary/20 rounded-lg text-sm font-bold">
                         ADMIN
                       </span>
                     </div>

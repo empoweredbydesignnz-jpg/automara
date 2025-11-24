@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { useBilling, ADDITIONAL_AUTOMATION_PRICE } from '../context/BillingContext';
+import StripePaymentModal from '../components/StripePaymentModal';
 
 function AutomationsLibrary() {
+  const [searchParams] = useSearchParams();
   const [workflows, setWorkflows] = useState([]);
   const [myWorkflows, setMyWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('library');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'library');
   const [syncing, setSyncing] = useState(false);
   const [activating, setActivating] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -15,9 +19,19 @@ function AutomationsLibrary() {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [togglingWorkflow, setTogglingWorkflow] = useState(false);
   const [togglingCardWorkflow, setTogglingCardWorkflow] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [purchasingWorkflow, setPurchasingWorkflow] = useState(null);
 
   // Get user from localStorage at the component level
   const user = JSON.parse(localStorage.getItem('user'));
+
+  // Billing context
+  const {
+    getTotalAllowedAutomations,
+    setActiveWorkflowCount,
+    purchaseAutomation,
+    purchasedAutomations
+  } = useBilling();
 
   useEffect(() => {
     fetchWorkflows();
@@ -80,6 +94,8 @@ function AutomationsLibrary() {
 
       setWorkflows(libraryTemplates);
       setMyWorkflows(userWorkflows);
+      // Update active workflow count for billing
+      setActiveWorkflowCount(userWorkflows.length);
     } catch (error) {
       console.error('Error fetching automations:', error);
       alert(
@@ -291,13 +307,38 @@ function AutomationsLibrary() {
   const displayedWorkflows =
     activeTab === 'library' ? workflows : myWorkflows;
 
+  // Check if workflow needs purchase (exceeds plan limit)
+  const needsPurchase = (workflowId) => {
+    const allowedCount = getTotalAllowedAutomations();
+    // If already purchased, no need to purchase again
+    if (purchasedAutomations.includes(workflowId)) return false;
+    // If under limit, no purchase needed
+    if (myWorkflows.length < allowedCount) return false;
+    return true;
+  };
+
+  const handlePurchaseClick = (workflow) => {
+    setPurchasingWorkflow(workflow);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = async () => {
+    if (purchasingWorkflow) {
+      purchaseAutomation(purchasingWorkflow.id);
+      setShowPaymentModal(false);
+      // Now activate the workflow
+      await handleActivateWorkflow(purchasingWorkflow.id);
+      setPurchasingWorkflow(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 border-4 border-purple-500/30 rounded-full" />
-            <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin" />
+            <div className="absolute inset-0 border-4 border-theme-primary/30 rounded-full" />
+            <div className="absolute inset-0 border-4 border-transparent border-t-theme-primary rounded-full animate-spin" />
           </div>
           <p className="text-slate-400 text-lg font-medium">
             Loading automations...
@@ -313,7 +354,7 @@ function AutomationsLibrary() {
         {/* Header + Sync */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent mb-2">
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-theme-accent via-theme-accent-alt to-theme-accent bg-clip-text text-transparent mb-2">
               {activeTab === 'library'
                 ? 'Automation Library'
                 : 'My Workflows'}
@@ -330,7 +371,7 @@ function AutomationsLibrary() {
             <button
               onClick={() => handleSyncN8N(true)}
               disabled={syncing}
-              className="group px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="group px-6 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <svg
                 className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`}
@@ -357,7 +398,7 @@ function AutomationsLibrary() {
               onClick={() => setActiveTab('library')}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'library'
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/30'
+                  ? 'bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark text-white shadow-md shadow-theme-primary/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
@@ -367,7 +408,7 @@ function AutomationsLibrary() {
               onClick={() => setActiveTab('my-workflows')}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'my-workflows'
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/30'
+                  ? 'bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark text-white shadow-md shadow-theme-primary/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
@@ -379,9 +420,9 @@ function AutomationsLibrary() {
         {/* Empty State */}
         {displayedWorkflows.length === 0 ? (
           <div className="mt-8 bg-gradient-to-br from-slate-900/40 to-slate-900/10 backdrop-blur-sm rounded-2xl border border-slate-800 p-10 text-center">
-            <div className="w-16 h-16 mx-auto mb-5 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl flex items-center justify-center border border-purple-500/20">
+            <div className="w-16 h-16 mx-auto mb-5 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-2xl flex items-center justify-center border border-theme-primary/20">
               <svg
-                className="w-8 h-8 text-purple-400"
+                className="w-8 h-8 text-theme-accent"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -419,7 +460,7 @@ function AutomationsLibrary() {
                   ? () => handleSyncN8N(true)
                   : () => setActiveTab('library')
               }
-              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all hover:scale-105"
+              className="px-8 py-3 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark rounded-xl font-semibold shadow-lg shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all hover:scale-105"
             >
               {activeTab === 'library'
                 ? 'Sync Workflows from n8n'
@@ -433,18 +474,18 @@ function AutomationsLibrary() {
               <div
                 key={workflow.id}
                 onClick={() => fetchWorkflowDetails(workflow)}
-                className="group relative bg-gradient-to-br from-slate-900/55 to-slate-900/25 backdrop-blur-sm rounded-2xl border border-slate-800 hover:border-purple-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 overflow-hidden cursor-pointer"
+                className="group relative bg-gradient-to-br from-slate-900/55 to-slate-900/25 backdrop-blur-sm rounded-2xl border border-slate-800 hover:border-theme-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-theme-primary/10 hover:-translate-y-1 overflow-hidden cursor-pointer"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-600/0 via-purple-600/0 to-pink-600/0 group-hover:from-purple-600/5 group-hover:to-pink-600/5 transition-all duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-dark/0 via-theme-primary-dark/0 to-theme-secondary-dark/0 group-hover:from-theme-primary-dark/5 group-hover:to-theme-secondary-dark/5 transition-all duration-300" />
                 <div className="relative p-6 flex flex-col h-full">
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4 gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center border border-purple-500/20 text-white font-bold text-lg">
+                      <div className="w-12 h-12 bg-gradient-to-br from-theme-primary-dark/20 to-theme-secondary-dark/20 rounded-xl flex items-center justify-center border border-theme-primary/20 text-white font-bold text-lg">
                         {workflow.name?.charAt(0) || 'A'}
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-white group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-purple-400 group-hover:to-pink-400 group-hover:bg-clip-text transition-all">
+                        <h3 className="text-lg font-semibold text-white group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-theme-accent group-hover:to-theme-accent-alt group-hover:bg-clip-text transition-all">
                           {workflow.name}
                         </h3>
                         <p className="text-[10px] text-slate-500 uppercase tracking-wider">
@@ -456,7 +497,7 @@ function AutomationsLibrary() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {activeTab === 'library' ? (
-                        <span className="px-2.5 py-1 rounded-full text-[9px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/25">
+                        <span className="px-2.5 py-1 rounded-full text-[9px] font-semibold bg-theme-primary/10 text-theme-accent border border-theme-primary/25">
                           TEMPLATE
                         </span>
                       ) : (
@@ -478,7 +519,7 @@ function AutomationsLibrary() {
                         </span>
                       )}
                       {workflow.folder_name && (
-                        <span className="px-2 py-0.5 rounded-full text-[8px] font-semibold bg-slate-900/80 text-purple-300 border border-purple-500/20">
+                        <span className="px-2 py-0.5 rounded-full text-[8px] font-semibold bg-slate-900/80 text-theme-accent/80 border border-theme-primary/20">
                           {workflow.folder_name}
                         </span>
                       )}
@@ -536,6 +577,27 @@ function AutomationsLibrary() {
                           <span>Folder: {workflow.folder_name}</span>
                         </div>
                       )}
+                    {/* Time Estimates */}
+                    {(workflow.manual_time_minutes || workflow.n8n_time_seconds) && (
+                      <div className="flex items-center gap-3 pt-1">
+                        {workflow.manual_time_minutes && (
+                          <div className="flex items-center gap-1.5 text-amber-400/80">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <span>{workflow.manual_time_minutes}m manual</span>
+                          </div>
+                        )}
+                        {workflow.n8n_time_seconds && (
+                          <div className="flex items-center gap-1.5 text-emerald-400/80">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span>{workflow.n8n_time_seconds}s auto</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}
@@ -547,7 +609,7 @@ function AutomationsLibrary() {
                             e.stopPropagation();
                             fetchWorkflowDetails(workflow);
                           }}
-                          className="flex-1 px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs rounded-xl border border-slate-700 hover:border-purple-500/40 transition-all flex items-center justify-center gap-1.5"
+                          className="flex-1 px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs rounded-xl border border-slate-700 hover:border-theme-primary/40 transition-all flex items-center justify-center gap-1.5"
                         >
                           <svg
                             className="w-3.5 h-3.5"
@@ -570,38 +632,63 @@ function AutomationsLibrary() {
                           </svg>
                           Info
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleActivateWorkflow(workflow.id);
-                          }}
-                          disabled={activating === workflow.id}
-                          className="flex-1 px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs rounded-xl font-semibold shadow-md shadow-purple-500/25 hover:shadow-purple-500/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                        >
-                          {activating === workflow.id ? (
-                            <>
-                              <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                              <span>Activating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 4v16m8-8H4"
-                                />
-                              </svg>
-                              <span>Activate</span>
-                            </>
-                          )}
-                        </button>
+                        {needsPurchase(workflow.id) ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePurchaseClick(workflow);
+                            }}
+                            className="flex-1 px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-xs rounded-xl font-semibold shadow-md shadow-amber-500/25 hover:shadow-amber-500/40 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                              />
+                            </svg>
+                            <span>${ADDITIONAL_AUTOMATION_PRICE}/mo</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleActivateWorkflow(workflow.id);
+                            }}
+                            disabled={activating === workflow.id}
+                            className="flex-1 px-3 py-2 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark hover:from-theme-primary hover:to-theme-secondary text-white text-xs rounded-xl font-semibold shadow-md shadow-theme-primary/25 hover:shadow-theme-primary/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                          >
+                            {activating === workflow.id ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                <span>Activating...</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg
+                                  className="w-3.5 h-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 4v16m8-8H4"
+                                  />
+                                </svg>
+                                <span>Activate</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </>
                     ) : (
                       <>
@@ -667,14 +754,14 @@ function AutomationsLibrary() {
             <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               {/* Modal Header */}
               <div className="relative p-8 border-b border-slate-800">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10" />
+                <div className="absolute inset-0 bg-gradient-to-r from-theme-primary-dark/10 to-theme-secondary-dark/10" />
                 <div className="relative flex items-start justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-purple-500/30">
+                    <div className="w-14 h-14 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-theme-primary/30">
                       {selectedWorkflow.name?.charAt(0) || 'A'}
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                      <h2 className="text-2xl font-bold bg-gradient-to-r from-theme-accent to-theme-accent-alt bg-clip-text text-transparent">
                         {selectedWorkflow.name}
                       </h2>
                       <p className="text-slate-400 text-xs">
@@ -712,8 +799,8 @@ function AutomationsLibrary() {
                 {loadingDetails ? (
                   <div className="flex items-center justify-center py-16">
                     <div className="relative w-16 h-16">
-                      <div className="absolute inset-0 border-4 border-purple-500/30 rounded-full" />
-                      <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin" />
+                      <div className="absolute inset-0 border-4 border-theme-primary/30 rounded-full" />
+                      <div className="absolute inset-0 border-4 border-transparent border-t-theme-primary rounded-full animate-spin" />
                     </div>
                   </div>
                 ) : (
@@ -760,7 +847,7 @@ function AutomationsLibrary() {
                                     {isLong && (
                                       <button
                                         onClick={() => setDescriptionExpanded(!descriptionExpanded)}
-                                        className="mt-2 text-purple-400 hover:text-purple-300 text-xs font-medium"
+                                        className="mt-2 text-theme-accent hover:text-theme-accent/80 text-xs font-medium"
                                       >
                                         {descriptionExpanded ? 'Show less' : 'Show more...'}
                                       </button>
@@ -812,6 +899,50 @@ function AutomationsLibrary() {
                       </div>
                     </div>
 
+                    {/* Time Estimates */}
+                    {(selectedWorkflow.manual_time_minutes || selectedWorkflow.n8n_time_seconds) && (
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+                        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                          Time Savings
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          {selectedWorkflow.manual_time_minutes && (
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                <span className="text-xs text-amber-400 font-semibold">Manual Time</span>
+                              </div>
+                              <p className="text-2xl font-bold text-amber-300">{selectedWorkflow.manual_time_minutes} min</p>
+                              <p className="text-xs text-amber-400/70 mt-1">Human effort required</p>
+                            </div>
+                          )}
+                          {selectedWorkflow.n8n_time_seconds && (
+                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                <span className="text-xs text-emerald-400 font-semibold">Automation Time</span>
+                              </div>
+                              <p className="text-2xl font-bold text-emerald-300">{selectedWorkflow.n8n_time_seconds} sec</p>
+                              <p className="text-xs text-emerald-400/70 mt-1">n8n execution time</p>
+                            </div>
+                          )}
+                        </div>
+                        {selectedWorkflow.manual_time_minutes && selectedWorkflow.n8n_time_seconds && (
+                          <div className="mt-4 pt-4 border-t border-slate-700">
+                            <p className="text-sm text-slate-400">
+                              Time saved: <span className="text-emerald-400 font-semibold">
+                                {Math.round((selectedWorkflow.manual_time_minutes * 60 - selectedWorkflow.n8n_time_seconds) / 60)} min
+                              </span> per execution
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Steps */}
                     {workflowDetails &&
                       workflowDetails.nodes &&
@@ -826,7 +957,7 @@ function AutomationsLibrary() {
                               (node, index) => (
                                 <div
                                   key={node.id || index}
-                                  className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 hover:border-purple-500/40 transition-all"
+                                  className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 hover:border-theme-primary/40 transition-all"
                                 >
                                   <div className="flex items-start justify-between mb-3">
                                     <div className="flex items-center gap-3">
@@ -842,7 +973,7 @@ function AutomationsLibrary() {
                                         </p>
                                       </div>
                                     </div>
-                                    <span className="px-2.5 py-1 rounded-full text-[9px] font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/30">
+                                    <span className="px-2.5 py-1 rounded-full text-[9px] font-semibold bg-theme-primary/10 text-theme-accent/80 border border-theme-primary/30">
                                       Step {index + 1}
                                     </span>
                                   </div>
@@ -949,7 +1080,7 @@ function AutomationsLibrary() {
                                 connections,
                               ]) => (
                                 <div key={nodeName}>
-                                  <span className="text-purple-300 font-semibold">
+                                  <span className="text-theme-accent/80 font-semibold">
                                     {nodeName}
                                   </span>
                                   <span className="text-slate-500">
@@ -1033,6 +1164,18 @@ function AutomationsLibrary() {
             </div>
           </div>
         )}
+
+        {/* Stripe Payment Modal for Additional Automations */}
+        <StripePaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setPurchasingWorkflow(null);
+          }}
+          onSuccess={handlePaymentSuccess}
+          paymentType="automation"
+          automationDetails={purchasingWorkflow}
+        />
       </div>
     </div>
   );

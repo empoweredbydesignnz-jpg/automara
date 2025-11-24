@@ -10,6 +10,9 @@ import Layout from './components/Layout'
 import UsersPage from './pages/UsersPage'
 import SubTenantsPage from './pages/SubTenantsPage'
 import AutomationsLibrary from './pages/AutomationsLibrary'
+import BillingPage from './pages/BillingPage'
+import { ThemeProvider } from './context/ThemeContext'
+import { BillingProvider } from './context/BillingContext'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -105,59 +108,64 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-theme-primary"></div>
       </div>
     )
   }
 
   return (
-    <Router>
-      <Routes>
-        <Route 
-          path="/login" 
-          element={
-            isAuthenticated ? 
-              <Navigate to="/dashboard" /> : 
-              <LoginPage onLogin={handleLogin} />
-          } 
-        />
-        
-        <Route 
-          path="/signup" 
-          element={
-            isAuthenticated ? 
-              <Navigate to="/dashboard" /> : 
-              <SignupPage />
-          } 
-        />
-        
-        <Route
-          path="/*"
-          element={
-            isAuthenticated ? (
-              <Layout 
-                user={user} 
-                currentTenant={currentTenant}
-                onLogout={handleLogout}
-                onSwitchTenant={switchTenant}
-              >
-                <Routes>
-                  <Route path="/dashboard" element={<Dashboard tenant={currentTenant} />} />
-                  <Route path="/tenants" element={<TenantsPage />} />
-                  <Route path="/automations" element={<AutomationsLibrary />} />
-		  <Route path="/users" element={<UsersPage />} />
-      <Route path="/tenants/:parentId/sub-tenants" element={<SubTenantsPage />} />
-                  <Route path="/settings" element={<SettingsPage user={user} />} />
-                  <Route path="/" element={<Navigate to="/dashboard" />} />
-                </Routes>
-              </Layout>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-      </Routes>
-    </Router>
+    <ThemeProvider>
+      <BillingProvider>
+      <Router>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              isAuthenticated ?
+                <Navigate to="/dashboard" /> :
+                <LoginPage onLogin={handleLogin} />
+            }
+          />
+
+          <Route
+            path="/signup"
+            element={
+              isAuthenticated ?
+                <Navigate to="/dashboard" /> :
+                <SignupPage />
+            }
+          />
+
+          <Route
+            path="/*"
+            element={
+              isAuthenticated ? (
+                <Layout
+                  user={user}
+                  currentTenant={currentTenant}
+                  onLogout={handleLogout}
+                  onSwitchTenant={switchTenant}
+                >
+                  <Routes>
+                    <Route path="/dashboard" element={<Dashboard tenant={currentTenant} />} />
+                    <Route path="/tenants" element={<TenantsPage />} />
+                    <Route path="/automations" element={<AutomationsLibrary />} />
+                    <Route path="/billing" element={<BillingPage />} />
+                    <Route path="/users" element={<UsersPage />} />
+                    <Route path="/tenants/:parentId/sub-tenants" element={<SubTenantsPage />} />
+                    <Route path="/settings" element={<SettingsPage user={user} />} />
+                    <Route path="/" element={<Navigate to="/dashboard" />} />
+                  </Routes>
+                </Layout>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+        </Routes>
+      </Router>
+      </BillingProvider>
+    </ThemeProvider>
   )
 }
 

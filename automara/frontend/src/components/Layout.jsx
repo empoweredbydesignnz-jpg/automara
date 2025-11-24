@@ -347,15 +347,15 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
       <aside
         className={`relative ${
           sidebarOpen ? 'w-72' : 'w-20'
-        } flex flex-col transition-all duration-300`}
+        } flex flex-col transition-all duration-300 ease-out`}
       >
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-lg border-r border-slate-800/80 shadow-2xl shadow-black/40" />
+        <div className="absolute inset-0 glass border-r border-white/5 shadow-2xl shadow-black/50" />
         <div className="relative flex flex-col h-full">
           {/* Brand + toggle */}
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/80">
             {sidebarOpen ? (
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/40">
+                <div className="w-9 h-9 bg-gradient-to-br from-theme-primary to-theme-secondary rounded-xl flex items-center justify-center shadow-lg shadow-theme-primary/40">
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -374,13 +374,13 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
                   <span className="text-[10px] text-slate-500 uppercase tracking-[0.16em]">
                     Automara
                   </span>
-                  <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  <span className="text-lg font-bold bg-gradient-to-r from-theme-accent to-theme-accent-alt bg-clip-text text-transparent">
                     Control Center
                   </span>
                 </div>
               </div>
             ) : (
-              <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/40">
+              <div className="w-9 h-9 bg-gradient-to-br from-theme-primary to-theme-secondary rounded-xl flex items-center justify-center shadow-lg shadow-theme-primary/40">
                 <svg
                   className="w-5 h-5 text-white"
                   fill="none"
@@ -431,7 +431,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
             <div className="w-full bg-slate-950/70 hover:bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-3 flex items-center gap-3 transition-all">
               {sidebarOpen ? (
                 <>
-                  <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-purple-500/30">
+                  <div className="w-9 h-9 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-theme-primary/30">
                     {tenantInitial}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -454,7 +454,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
                   </div>
                 </>
               ) : (
-                <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-purple-500/30">
+                <div className="w-9 h-9 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-theme-primary/30">
                   {tenantInitial}
                 </div>
               )}
@@ -469,17 +469,17 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                     active
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/30'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent hover:border-purple-500/20'
+                      ? 'bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark text-white shadow-lg shadow-theme-primary/40 glow-primary'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-theme-primary/20'
                   }`}
                 >
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justifycenter transition-all ${
                       active
                         ? 'bg-white/10 text-white'
-                        : 'bg-slate-900/80 text-slate-400 group-hover:bg-slate-900 group-hover:text-purple-300'
+                        : 'bg-slate-900/80 text-slate-400 group-hover:bg-slate-900 group-hover:text-theme-accent'
                     }`}
                   >
                     {item.icon}

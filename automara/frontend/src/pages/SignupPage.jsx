@@ -114,31 +114,35 @@ function SignupPage() {
   const progressPercentage = (step / 4) * 100
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
-      <div className="max-w-2xl w-full relative z-10">
-        <div className="bg-gray-800 bg-opacity-50 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gray-700">
-          
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-theme-primary-dark/20 to-gray-950 p-4 relative overflow-hidden">
+      {/* Ambient glow effects */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-theme-primary/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-theme-secondary/20 rounded-full blur-3xl animate-pulse delay-1000" />
+
+      <div className="max-w-2xl w-full relative z-10 animate-fade-in">
+        <div className="glass-card rounded-2xl p-8 premium-shadow">
+
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-theme-primary to-theme-secondary rounded-2xl mb-4 shadow-lg shadow-theme-primary/40 glow-primary">
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Join Automara</h1>
-            <p className="text-gray-400">Create your multi-tenant workspace</p>
+            <h1 className="text-3xl font-bold text-gradient mb-2">Join Automara</h1>
+            <p className="text-gray-400 tracking-wide">Create your multi-tenant workspace</p>
           </div>
 
           <div className="mb-8">
             <div className="flex justify-between mb-2">
               {['Company', 'Personal', 'Security', 'Finish'].map((label, index) => (
-                <div key={index} className={`text-sm font-medium ${step > index ? 'text-purple-400' : step === index + 1 ? 'text-white' : 'text-gray-500'}`}>
+                <div key={index} className={`text-sm font-medium ${step > index ? 'text-theme-accent' : step === index + 1 ? 'text-white' : 'text-gray-500'}`}>
                   {label}
                 </div>
               ))}
             </div>
             <div className="w-full bg-gray-700 rounded-full h-2">
               <div 
-                className="bg-gradient-to-r from-purple-600 to-pink-600 h-2 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark h-2 rounded-full transition-all duration-500"
                 style={{ width: progressPercentage + '%' }}
               ></div>
             </div>
@@ -164,7 +168,7 @@ function SignupPage() {
                     value={formData.companyName}
                     onChange={handleChange}
                     placeholder="Acme Corporation"
-                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
                   />
                 </div>
 
@@ -177,7 +181,7 @@ function SignupPage() {
                       value={formData.domain}
                       onChange={handleChange}
                       placeholder="mycompany"
-                      className="flex-1 px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-l-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="flex-1 px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-l-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
                     />
                     <span className="px-4 py-3 bg-gray-700 border border-l-0 border-gray-600 rounded-r-lg text-gray-400">.automara.com</span>
                    </div>
@@ -191,7 +195,7 @@ function SignupPage() {
                     name="tenantType"
                     value={formData.tenantType}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-theme-primary"
                   >
                     <option value="client">Single Business Entity</option>
                     <option value="msp">Managed Service Provider (MSP)</option>
@@ -218,7 +222,7 @@ function SignupPage() {
                       value={formData.firstName}
                       onChange={handleChange}
                       placeholder="John"
-                      className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
                     />
                   </div>
 
@@ -230,7 +234,7 @@ function SignupPage() {
                       value={formData.lastName}
                       onChange={handleChange}
                       placeholder="Doe"
-                      className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
                     />
                   </div>
                 </div>
@@ -243,7 +247,7 @@ function SignupPage() {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="john@company.com"
-                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
                   />
                 </div>
               </div>
@@ -261,7 +265,7 @@ function SignupPage() {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
                   />
                 </div>
 
@@ -273,7 +277,7 @@ function SignupPage() {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-theme-primary"
                   />
                 </div>
               </div>
@@ -289,7 +293,7 @@ function SignupPage() {
                     name="industry"
                     value={formData.industry}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-gray-900 bg-opacity-50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-theme-primary"
                   >
                     <option value="">Select your industry</option>
                     <option value="technology">Technology</option>
@@ -307,7 +311,7 @@ function SignupPage() {
                       name="agreeToTerms"
                       checked={formData.agreeToTerms}
                       onChange={handleChange}
-                      className="mt-1 w-5 h-5 rounded border-gray-600 text-purple-600 focus:ring-purple-500"
+                      className="mt-1 w-5 h-5 rounded border-gray-600 text-theme-primary-dark focus:ring-theme-primary"
                     />
                     <span className="text-sm text-gray-300">
                       I agree to the Terms of Service and Privacy Policy
@@ -340,7 +344,7 @@ function SignupPage() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition"
+                  className="bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark text-white font-semibold py-3.5 px-6 rounded-xl hover:from-theme-primary hover:to-theme-secondary transition-all btn-premium shadow-lg shadow-theme-primary/30"
                 >
                   Continue
                 </button>
@@ -348,7 +352,7 @@ function SignupPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 flex items-center space-x-2"
+                  className="bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark text-white font-semibold py-3.5 px-6 rounded-xl hover:from-theme-primary hover:to-theme-secondary transition-all btn-premium shadow-lg shadow-theme-primary/30 disabled:opacity-50 flex items-center space-x-2"
                 >
                   {loading ? (
                     <>
@@ -367,7 +371,7 @@ function SignupPage() {
           </form>
         </div>
 
-        <p className="text-center text-gray-500 text-sm mt-8">
+        <p className="text-center text-gray-600 text-sm mt-8 tracking-wider">
           Empowered by Design © 2025
         </p>
       </div>

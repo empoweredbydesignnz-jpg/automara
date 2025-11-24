@@ -76,33 +76,33 @@ function SubTenantsPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-theme-primary"></div>
       </div>
     )
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
         <button
           onClick={() => navigate('/tenants')}
-          className="text-purple-400 hover:text-purple-300 mb-4 flex items-center space-x-2"
+          className="text-theme-accent hover:text-theme-accent/80 mb-4 flex items-center space-x-2 transition-colors"
         >
           <span>←</span>
           <span>Back to Tenants</span>
         </button>
-        
+
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-3xl font-bold text-gradient mb-2 tracking-tight">
               Sub-Tenants of {parentTenant?.name}
             </h1>
-            <p className="text-gray-400">Manage client organizations under this MSP</p>
+            <p className="text-gray-400 tracking-wide">Manage client organizations under this MSP</p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-blue-700 hover:to-purple-700 transition flex items-center space-x-2"
+            className="bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark text-white font-semibold py-3 px-6 rounded-xl hover:from-theme-primary hover:to-theme-secondary transition-all btn-premium shadow-lg shadow-theme-primary/30 flex items-center space-x-2"
           >
             <span>+</span>
             <span>Add Client</span>
@@ -112,7 +112,7 @@ function SubTenantsPage() {
 
       {/* Sub-Tenants Grid */}
       {subTenants.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
+        <div className="text-center py-12 glass-card rounded-xl">
           <div className="text-6xl mb-4">🏢</div>
           <h3 className="text-xl font-semibold text-white mb-2">No sub-tenants yet</h3>
           <p className="text-gray-400 mb-6">Create your first client organization</p>
@@ -128,10 +128,10 @@ function SubTenantsPage() {
           {subTenants.map((tenant) => (
             <div
               key={tenant.id}
-              className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-blue-500 transition"
+              className="glass-card rounded-xl p-6 hover:border-theme-primary/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-theme-primary/20"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                <div className="w-12 h-12 bg-gradient-to-br from-theme-primary to-theme-secondary rounded-lg flex items-center justify-center text-white font-bold text-xl">
                   {tenant.name.charAt(0)}
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -163,8 +163,8 @@ function SubTenantsPage() {
 
       {/* Add Sub-Tenant Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl p-8 max-w-md w-full border border-gray-700">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-card rounded-xl p-8 max-w-md w-full premium-shadow animate-scale-in">
             <h2 className="text-2xl font-bold text-white mb-6">Add Client Tenant</h2>
             
             <form onSubmit={handleAddSubTenant} className="space-y-4">
@@ -214,7 +214,7 @@ function SubTenantsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-4 rounded-lg transition font-medium"
+                  className="flex-1 bg-gradient-to-r from-theme-primary-dark to-theme-secondary-dark hover:from-theme-primary hover:to-theme-secondary text-white py-3 px-4 rounded-lg transition font-medium"
                 >
                   Create Client
                 </button>
