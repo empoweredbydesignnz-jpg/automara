@@ -3,7 +3,14 @@
     "allow": [
       "Bash(docker exec:*)",
       "Bash(docker-compose:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(npm start)",
+      "Bash(pm2 restart:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)",
+      "Bash(dir /s /b *.sql 2)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []

@@ -372,20 +372,87 @@ app.post('/api/tenants', filterTenantsByRole, async (req, res) => {
 app.patch('/api/tenants/:id/status', filterTenantsByRole, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  
+
   try {
     const result = await pool.query(
       'UPDATE client_tenants SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       [status, id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Tenant not found' });
     }
-    
+
     res.json({ success: true, tenant: result.rows[0] });
   } catch (error) {
     console.error('Error updating tenant status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update tenant details (name, domain, owner_email, billing_plan)
+app.put('/api/tenants/:id', filterTenantsByRole, async (req, res) => {
+  const { id } = req.params;
+  const { name, domain, owner_email, billing_plan } = req.body;
+  const userRole = req.headers['x-user-role'];
+
+  // Only global_admin can update tenant details
+  if (userRole !== 'global_admin') {
+    return res.status(403).json({ error: 'Only global administrators can update tenant details' });
+  }
+
+  try {
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name) {
+      updates.push(`name = $${paramCount}`);
+      values.push(name);
+      paramCount++;
+    }
+
+    if (domain) {
+      updates.push(`domain = $${paramCount}`);
+      values.push(domain);
+      paramCount++;
+    }
+
+    if (owner_email) {
+      updates.push(`owner_email = $${paramCount}`);
+      values.push(owner_email);
+      paramCount++;
+    }
+
+    if (billing_plan) {
+      updates.push(`billing_plan = $${paramCount}`);
+      values.push(billing_plan);
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    updates.push('updated_at = NOW()');
+    values.push(id);
+
+    const result = await pool.query(
+      `UPDATE client_tenants SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Tenant updated successfully',
+      tenant: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating tenant:', error);
     res.status(500).json({ error: error.message });
   }
 });

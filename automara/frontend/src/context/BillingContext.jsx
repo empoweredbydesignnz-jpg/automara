@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const BillingContext = createContext();
 
@@ -50,21 +51,53 @@ export const plans = {
 export const ADDITIONAL_AUTOMATION_PRICE = 10;
 
 export function BillingProvider({ children }) {
-  const [currentPlan, setCurrentPlan] = useState(() => {
-    const saved = localStorage.getItem('billing-plan');
-    return saved || 'starter';
-  });
-
+  const [currentPlan, setCurrentPlan] = useState('starter');
   const [purchasedAutomations, setPurchasedAutomations] = useState(() => {
     const saved = localStorage.getItem('purchased-automations');
     return saved ? JSON.parse(saved) : [];
   });
-
   const [activeWorkflowCount, setActiveWorkflowCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
+  // Fetch billing plan from tenant data on mount
   useEffect(() => {
-    localStorage.setItem('billing-plan', currentPlan);
-  }, [currentPlan]);
+    const fetchTenantBillingPlan = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const currentTenant = JSON.parse(localStorage.getItem('currentTenant'));
+
+        // If user is global_admin, use default starter plan
+        if (user?.role === 'global_admin') {
+          setCurrentPlan('starter');
+          setLoading(false);
+          return;
+        }
+
+        // For regular users, fetch their tenant's billing plan
+        if (user?.tenantId || currentTenant?.id) {
+          const response = await axios.get('/api/tenants', {
+            headers: {
+              'x-user-role': user?.role || 'client_user',
+              'x-tenant-id': user?.tenantId || ''
+            }
+          });
+
+          const tenants = response.data.tenants || [];
+          const userTenant = tenants.find(t => t.id === (user?.tenantId || currentTenant?.id));
+
+          if (userTenant?.billing_plan) {
+            setCurrentPlan(userTenant.billing_plan);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching tenant billing plan:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTenantBillingPlan();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('purchased-automations', JSON.stringify(purchasedAutomations));
@@ -115,6 +148,7 @@ export function BillingProvider({ children }) {
       needsPurchase,
       purchaseAutomation,
       upgradePlan,
+      loading,
       ADDITIONAL_AUTOMATION_PRICE
     }}>
       {children}

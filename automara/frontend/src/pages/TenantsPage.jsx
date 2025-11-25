@@ -98,11 +98,20 @@ function TenantsPage() {
     setSaving(true);
     try {
       const user = JSON.parse(localStorage.getItem('user'));
-      await axios.put(`/api/tenants/${selectedTenant.id}`, {
+
+      // Prepare the update payload
+      const updatePayload = {
         name: selectedTenant.name,
         domain: selectedTenant.domain,
         owner_email: selectedTenant.owner_email
-      }, {
+      };
+
+      // Only include billing_plan if user is global_admin
+      if (user?.role === 'global_admin' && selectedTenant.billing_plan) {
+        updatePayload.billing_plan = selectedTenant.billing_plan;
+      }
+
+      await axios.put(`/api/tenants/${selectedTenant.id}`, updatePayload, {
         headers: {
           'x-user-role': user?.role || 'client_user',
           'x-tenant-id': user?.tenantId || ''

@@ -431,7 +431,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
             <div className="w-full bg-slate-950/70 hover:bg-slate-900/80 border border-slate-800 rounded-2xl px-3 py-3 flex items-center gap-3 transition-all">
               {sidebarOpen ? (
                 <>
-                  <div className="w-9 h-9 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-theme-primary/30">
+                  <div className="w-9 h-9 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md shadow-theme-primary/30">
                     {tenantInitial}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -454,7 +454,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
                   </div>
                 </>
               ) : (
-                <div className="w-9 h-9 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justifycenter text-xs font-bold text-white shadow-md shadow-theme-primary/30">
+                <div className="w-9 h-9 bg-gradient-to-br from-theme-primary-dark to-theme-secondary-dark rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-md shadow-theme-primary/30">
                   {tenantInitial}
                 </div>
               )}
@@ -476,7 +476,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
                   }`}
                 >
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justifycenter transition-all ${
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                       active
                         ? 'bg-white/10 text-white'
                         : 'bg-slate-900/80 text-slate-400 group-hover:bg-slate-900 group-hover:text-theme-accent'
@@ -504,7 +504,7 @@ function Layout({ children, user, currentTenant, onLogout, onSwitchTenant }) {
           <div className="px-4 py-4 border-t border-slate-800/80">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justifycenter text-white font-bold shadow-lg shadow-blue-500/30">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">
                   {userInitial}
                 </div>
                 <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-950" />

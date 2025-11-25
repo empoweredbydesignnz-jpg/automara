@@ -296,6 +296,83 @@ router.post('/subscription', verifySession(), async (req, res) => {
 
 /**
  * @swagger
+ * /api/tenants/:id:
+ *   put:
+ *     summary: Update a tenant (global_admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.put('/:id', async (req, res) => {
+    try {
+        const tenantId = req.params.id;
+        const { name, domain, owner_email, billing_plan } = req.body;
+        const userRole = req.headers['x-user-role'];
+
+        // Only global_admin can update tenants
+        if (userRole !== 'global_admin') {
+            return res.status(403).json({ error: 'Only global administrators can update tenants' });
+        }
+
+        const updates = [];
+        const values = [];
+        let paramCount = 1;
+
+        if (name) {
+            updates.push(`name = $${paramCount}`);
+            values.push(name);
+            paramCount++;
+        }
+
+        if (domain) {
+            updates.push(`domain = $${paramCount}`);
+            values.push(domain);
+            paramCount++;
+        }
+
+        if (owner_email) {
+            updates.push(`owner_email = $${paramCount}`);
+            values.push(owner_email);
+            paramCount++;
+        }
+
+        if (billing_plan) {
+            updates.push(`subscription_plan = $${paramCount}`);
+            values.push(billing_plan);
+            paramCount++;
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No valid fields to update' });
+        }
+
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(tenantId);
+
+        const result = await global.db.query(
+            `UPDATE public.tenants
+             SET ${updates.join(', ')}
+             WHERE id = $${paramCount}
+             RETURNING *`,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        res.json({
+            message: 'Tenant updated successfully',
+            tenant: result.rows[0],
+        });
+    } catch (err) {
+        console.error('Error updating tenant:', err);
+        res.status(500).json({ error: 'Failed to update tenant', details: err.message });
+    }
+});
+
+/**
+ * @swagger
  * /api/tenants/usage:
  *   get:
  *     summary: Get tenant usage statistics
