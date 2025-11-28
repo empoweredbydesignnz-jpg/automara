@@ -5,6 +5,7 @@ const { Pool } = require('pg');
 const axios = require('axios');
 const workflowActivationRoutes = require('./routes/workflow-activation');
 const userRoutes = require('./routes/users');
+const ticketRoutes = require('./routes/tickets');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -673,6 +674,9 @@ app.use('/api', workflowActivationRoutes);
 
 // User routes
 app.use('/api/users', userRoutes(pool));
+
+// Ticket routes
+app.use('/api/tickets', ticketRoutes(pool));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

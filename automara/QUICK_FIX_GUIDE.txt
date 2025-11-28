@@ -1,0 +1,120 @@
+================================================================================
+QUICK FIX GUIDE - Tickets Not Showing
+================================================================================
+
+ISSUE: Stats show "1 total, 1 open" but list says "No tickets found"
+
+SOLUTION: The backend has been fixed. Just restart it!
+
+================================================================================
+STEP 1: RESTART BACKEND
+================================================================================
+
+Option A - Double-click this file:
+    y:\RESTART_BACKEND.bat
+
+Option B - Run manually:
+    docker restart automara-backend
+
+================================================================================
+STEP 2: REFRESH YOUR BROWSER
+================================================================================
+
+1. Go to your tickets page: http://your-domain/tickets
+2. Press Ctrl + Shift + R (hard refresh)
+3. Tickets should now display!
+
+================================================================================
+WHAT WAS FIXED
+================================================================================
+
+The SQL query had a table alias issue:
+❌ OLD: WHERE tenant_id = ANY($1::int[])
+✅ NEW: WHERE t.tenant_id = ANY($1::int[])
+
+Also added:
+- Better null checks for tenant ID
+- Debug logging to troubleshoot
+- Type conversion (string to int)
+
+================================================================================
+VERIFY IT WORKS
+================================================================================
+
+After restarting, you should see:
+✅ Stats show: "1 total, 1 open"
+✅ Ticket list shows your ticket
+✅ You can click to view ticket details
+✅ You can add comments
+
+================================================================================
+STILL NOT WORKING?
+================================================================================
+
+Check these:
+
+1. Backend actually restarted?
+   docker logs automara-backend --tail 20
+   Should see: "🚀 Automara Backend running on port 4000"
+
+2. Headers being sent correctly?
+   Open browser DevTools (F12) → Network tab
+   Click on /api/tickets request → Headers
+   Should see:
+   - x-user-role: msp_admin
+   - x-tenant-id: <some number>
+   - x-user-id: <some number>
+
+3. Tenant ID matches?
+   Run: y:\CHECK_TICKETS_DB.bat
+   Compare your user's tenant_id with the ticket's tenant_id
+
+4. Check backend logs:
+   docker logs automara-backend --tail 100
+   Look for errors or debug output
+
+================================================================================
+DEBUG MODE
+================================================================================
+
+The backend now has debug logging. After restart, refresh the page and check:
+
+    docker logs automara-backend --tail 50
+
+You should see:
+    === GET /api/tickets DEBUG ===
+    User Role: msp_admin
+    Tenant ID: 5
+    [buildTenantFilter] Found tenant IDs: [5]
+    Tickets Found: 1
+
+If you see:
+    Tickets Found: 0
+
+Then check the tenant filter output to see why.
+
+================================================================================
+NEED MORE HELP?
+================================================================================
+
+Read the detailed guide:
+    y:\TICKET_BUG_FIX.md
+
+Check the database directly:
+    y:\CHECK_TICKETS_DB.bat
+
+View backend logs:
+    docker logs automara-backend --tail 100 --follow
+
+================================================================================
+CONTACT
+================================================================================
+
+If still having issues, collect this info:
+
+1. Output from: docker logs automara-backend --tail 50
+2. Screenshot of browser Network tab showing /api/tickets request
+3. Output from: y:\CHECK_TICKETS_DB.bat
+4. What user you're logged in as (email and role)
+
+================================================================================

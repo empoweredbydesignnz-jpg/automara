@@ -10,7 +10,18 @@
       "Bash(findstr:*)",
       "Bash(netstat:*)",
       "Bash(dir /s /b *.sql 2)",
-      "Bash(nul)"
+      "Bash(nul)",
+      "Bash(dir /s /b y:frontendsrc*.jsx 2)",
+      "Bash(dir:*)",
+      "Bash(cat:*)",
+      "Bash(docker restart:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(docker ps:*)",
+      "Bash(curl:*)",
+      "Bash(psql:*)",
+      "Bash(docker version:*)",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": []

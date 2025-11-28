@@ -353,10 +353,23 @@ function AutomationsLibrary() {
         console.log('Found nodes:', data.nodes.length);
         data.nodes.forEach(node => {
           const nodeType = node.type?.toLowerCase() || '';
-          console.log('Processing node:', node.name, 'type:', nodeType);
+          const params = node.parameters || {};
+          console.log('Processing node:', node.name, 'type:', nodeType, 'parameters:', params);
+
+          // Helper function to extract URL from parameters
+          const extractUrl = (params) => {
+            if (params.url) return params.url;
+            if (params.uri) return params.uri;
+            if (params.endpoint) return params.endpoint;
+            if (params.baseUrl) return params.baseUrl;
+            if (params.baseURL) return params.baseURL;
+            if (params.host) return params.host;
+            return null;
+          };
 
           // Webhook nodes
           if (nodeType.includes('webhook')) {
+            const webhookUrl = params.path || params.webhookUrl || params.url || '';
             fields.push({
               key: `${node.id}_webhook_url`,
               label: `${node.name} - Webhook URL`,
@@ -365,12 +378,18 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'webhook',
               placeholder: 'https://your-domain.com/webhook',
+              defaultValue: webhookUrl,
               required: false
             });
           }
 
-          // HTTP Request nodes - API keys
+          // HTTP Request nodes - API keys and endpoints
+          // COMMENTED OUT - Disabled HTTP request node field generation
+          /*
           if (nodeType.includes('httprequest') || nodeType.includes('http')) {
+            const detectedUrl = extractUrl(params);
+
+            // API Key field (always empty for security)
             fields.push({
               key: `${node.id}_api_key`,
               label: `${node.name} - API Key`,
@@ -379,8 +398,11 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'http',
               placeholder: 'Enter API key',
+              defaultValue: '',
               required: false
             });
+
+            // API Endpoint field (auto-populated if found)
             fields.push({
               key: `${node.id}_api_endpoint`,
               label: `${node.name} - API Endpoint`,
@@ -389,12 +411,127 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'http',
               placeholder: 'https://api.example.com/v1',
+              defaultValue: detectedUrl || '',
               required: false
             });
+
+            // Special case: DeepSeek search prompt (for HTTP DeepSeek Request node)
+            console.log('[DEEPSEEK CHECK] Node ID:', node.id, 'Name:', node.name);
+            console.log('[DEEPSEEK CHECK] Matches deRn1CKUTS9UUMzs?', node.id === 'deRn1CKUTS9UUMzs');
+            console.log('[DEEPSEEK CHECK] Name includes deepseek?', node.name?.toLowerCase().includes('deepseek'));
+
+            if (node.id === 'deRn1CKUTS9UUMzs' || node.name?.toLowerCase().includes('deepseek')) {
+              console.log('[DEEPSEEK] Processing DeepSeek node:', node.name);
+              console.log('[DEEPSEEK] Full node parameters:', JSON.stringify(params, null, 2));
+
+              // Extract the search prompt from bodyParametersJson or options.bodyContentType
+              let deepseekPrompt = '';
+
+              try {
+                // Method 1: Check if there's a bodyParametersJson field
+                if (params.bodyParametersJson) {
+                  console.log('[DEEPSEEK] Found bodyParametersJson');
+                  const bodyJson = typeof params.bodyParametersJson === 'string'
+                    ? JSON.parse(params.bodyParametersJson)
+                    : params.bodyParametersJson;
+
+                  console.log('[DEEPSEEK] Parsed bodyJson:', JSON.stringify(bodyJson, null, 2));
+
+                  // Check for direct "text" field (line 6 in JSON)
+                  if (bodyJson.text) {
+                    console.log('[DEEPSEEK] Found text field:', bodyJson.text);
+                    deepseekPrompt = bodyJson.text;
+                  }
+                  // Check for messages array with user content
+                  else if (bodyJson.messages && Array.isArray(bodyJson.messages)) {
+                    console.log('[DEEPSEEK] Found messages array');
+                    const userMessage = bodyJson.messages.find(m => m.role === 'user');
+                    if (userMessage && userMessage.content) {
+                      console.log('[DEEPSEEK] Found user message content:', userMessage.content);
+                      deepseekPrompt = userMessage.content;
+                    }
+                  }
+                }
+
+                // Method 2: Check options.body.values if it exists
+                if (!deepseekPrompt && params.options?.body?.values) {
+                  console.log('[DEEPSEEK] Checking options.body.values');
+                  const bodyValues = params.options.body.values;
+                  if (Array.isArray(bodyValues)) {
+                    // Check for a field named "text"
+                    const textField = bodyValues.find(v => v.name === 'text');
+                    if (textField && textField.value) {
+                      console.log('[DEEPSEEK] Found text field in body values:', textField.value);
+                      deepseekPrompt = textField.value;
+                    }
+                    // Also check for messages field
+                    else {
+                      const messagesField = bodyValues.find(v => v.name === 'messages');
+                      if (messagesField && messagesField.value) {
+                        try {
+                          const messages = JSON.parse(messagesField.value);
+                          if (Array.isArray(messages)) {
+                            const userMessage = messages.find(m => m.role === 'user');
+                            if (userMessage && userMessage.content) {
+                              console.log('[DEEPSEEK] Found user message in body values:', userMessage.content);
+                              deepseekPrompt = userMessage.content;
+                            }
+                          }
+                        } catch (e) {
+                          console.log('[DEEPSEEK] Could not parse messages from body values:', e);
+                        }
+                      }
+                    }
+                  }
+                }
+
+                // Method 3: Check sendBody parameter
+                if (!deepseekPrompt && params.sendBody) {
+                  console.log('[DEEPSEEK] Checking sendBody parameter');
+                  try {
+                    const bodyData = typeof params.sendBody === 'string'
+                      ? JSON.parse(params.sendBody)
+                      : params.sendBody;
+
+                    if (bodyData.text) {
+                      console.log('[DEEPSEEK] Found text in sendBody:', bodyData.text);
+                      deepseekPrompt = bodyData.text;
+                    }
+                  } catch (e) {
+                    console.log('[DEEPSEEK] Could not parse sendBody:', e);
+                  }
+                }
+
+                console.log('[DEEPSEEK] Final extracted prompt:', deepseekPrompt);
+              } catch (e) {
+                console.log('[DEEPSEEK] Error extracting DeepSeek prompt:', e);
+              }
+
+              fields.push({
+                key: `${node.id}_deepseek_prompt`,
+                label: `${node.name} - Search Prompt`,
+                type: 'textarea',
+                nodeId: node.id,
+                nodeName: node.name,
+                nodeType: 'deepseek',
+                placeholder: 'Enter what you want DeepSeek to search for...',
+                defaultValue: deepseekPrompt,
+                required: false,
+                rows: 4
+              });
+
+              console.log('[DEEPSEEK] Added field to settings:', {
+                key: `${node.id}_deepseek_prompt`,
+                defaultValue: deepseekPrompt
+              });
+            }
           }
+          */
 
           // Email nodes
           if (nodeType.includes('email') || nodeType.includes('gmail') || nodeType.includes('smtp')) {
+            const emailAddress = params.fromEmail || params.toEmail || params.email || '';
+
             fields.push({
               key: `${node.id}_email`,
               label: `${node.name} - Email Address`,
@@ -403,9 +540,29 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'email',
               placeholder: 'email@example.com',
+              defaultValue: emailAddress,
               required: false
             });
+
             if (nodeType.includes('smtp')) {
+              const smtpHost = params.host || params.smtpHost || '';
+
+              // SMTP Host (auto-populated)
+              if (smtpHost) {
+                fields.push({
+                  key: `${node.id}_smtp_host`,
+                  label: `${node.name} - SMTP Host`,
+                  type: 'text',
+                  nodeId: node.id,
+                  nodeName: node.name,
+                  nodeType: 'email',
+                  placeholder: 'smtp.example.com',
+                  defaultValue: smtpHost,
+                  required: false
+                });
+              }
+
+              // SMTP Password (always empty)
               fields.push({
                 key: `${node.id}_smtp_password`,
                 label: `${node.name} - SMTP Password`,
@@ -414,6 +571,7 @@ function AutomationsLibrary() {
                 nodeName: node.name,
                 nodeType: 'email',
                 placeholder: 'Enter SMTP password',
+                defaultValue: '',
                 required: false
               });
             }
@@ -421,6 +579,9 @@ function AutomationsLibrary() {
 
           // Slack nodes
           if (nodeType.includes('slack')) {
+            const slackChannel = params.channel || params.channelId || '';
+
+            // Slack Token (always empty for security)
             fields.push({
               key: `${node.id}_slack_token`,
               label: `${node.name} - Slack Token`,
@@ -429,8 +590,11 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'slack',
               placeholder: 'xoxb-...',
+              defaultValue: '',
               required: false
             });
+
+            // Slack Channel (auto-populated)
             fields.push({
               key: `${node.id}_slack_channel`,
               label: `${node.name} - Slack Channel`,
@@ -439,12 +603,39 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'slack',
               placeholder: '#general',
+              defaultValue: slackChannel,
               required: false
             });
           }
 
+          // Facebook nodes - Special handling for node 580062478519892
+          if (node.id === '580062478519892' || nodeType.includes('facebook')) {
+            console.log('[FACEBOOK] Processing Facebook node:', node.name, 'ID:', node.id);
+            console.log('[FACEBOOK] Node parameters:', JSON.stringify(params, null, 2));
+
+            // Facebook Access Token field (always empty for security)
+            fields.push({
+              key: `${node.id}_facebook_token`,
+              label: `${node.name} - Facebook Access Token`,
+              type: 'password',
+              nodeId: node.id,
+              nodeName: node.name,
+              nodeType: 'facebook',
+              placeholder: 'Enter Facebook Access Token',
+              defaultValue: '',
+              required: false,
+              helpText: 'This token will be stored as a credential in n8n and applied to this node'
+            });
+
+            console.log('[FACEBOOK] Added Facebook token field for node:', node.name);
+          }
+
           // Database nodes
           if (nodeType.includes('postgres') || nodeType.includes('mysql') || nodeType.includes('database')) {
+            const dbHost = params.host || '';
+            const dbName = params.database || params.databaseName || '';
+            const dbUser = params.user || params.username || '';
+
             fields.push({
               key: `${node.id}_db_host`,
               label: `${node.name} - Database Host`,
@@ -453,6 +644,7 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'database',
               placeholder: 'localhost:5432',
+              defaultValue: dbHost,
               required: false
             });
             fields.push({
@@ -463,6 +655,7 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'database',
               placeholder: 'database_name',
+              defaultValue: dbName,
               required: false
             });
             fields.push({
@@ -473,8 +666,10 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'database',
               placeholder: 'username',
+              defaultValue: dbUser,
               required: false
             });
+            // Database Password (always empty for security)
             fields.push({
               key: `${node.id}_db_password`,
               label: `${node.name} - Database Password`,
@@ -483,12 +678,14 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'database',
               placeholder: 'Enter password',
+              defaultValue: '',
               required: false
             });
           }
 
           // Google Sheets/Drive nodes
           if (nodeType.includes('google')) {
+            // Google Credentials (always empty for security)
             fields.push({
               key: `${node.id}_google_credentials`,
               label: `${node.name} - Google Credentials JSON`,
@@ -497,6 +694,7 @@ function AutomationsLibrary() {
               nodeName: node.name,
               nodeType: 'google',
               placeholder: 'Paste Google service account JSON',
+              defaultValue: '',
               required: false
             });
           }
@@ -504,6 +702,7 @@ function AutomationsLibrary() {
           // Generic OAuth/API credentials
           if (node.credentials && Object.keys(node.credentials).length > 0) {
             Object.keys(node.credentials).forEach(credType => {
+              // Credentials (always empty for security)
               fields.push({
                 key: `${node.id}_${credType}_credentials`,
                 label: `${node.name} - ${credType} Credentials`,
@@ -512,6 +711,7 @@ function AutomationsLibrary() {
                 nodeName: node.name,
                 nodeType: 'credential',
                 placeholder: 'Enter credentials',
+                defaultValue: '',
                 required: false
               });
             });
@@ -539,18 +739,49 @@ function AutomationsLibrary() {
     try {
       setSavingSettings(true);
 
-      // Save to localStorage (in production, this would go to backend)
+      // Save to localStorage
       const savedConfigs = JSON.parse(localStorage.getItem('workflow_configs') || '{}');
       savedConfigs[settingsWorkflow.id] = workflowConfig;
       localStorage.setItem('workflow_configs', JSON.stringify(savedConfigs));
 
-      alert('Workflow settings saved successfully!');
+      // Update workflow in n8n via backend API
+      console.log('[SETTINGS] Sending settings to backend for workflow:', settingsWorkflow.id);
+      console.log('[SETTINGS] Settings data:', workflowConfig);
+
+      const response = await axios.put(
+        `/api/workflows/${settingsWorkflow.id}/settings`,
+        { settings: workflowConfig },
+        {
+          headers: {
+            'x-user-role': user?.role || 'client_user',
+            'x-tenant-id': user?.tenantId || '',
+            'x-user-id': user?.id || ''
+          }
+        }
+      );
+
+      console.log('[SETTINGS] Backend response:', response.data);
+
+      if (response.data.success) {
+        alert('Workflow settings saved and synced to n8n successfully!');
+      } else {
+        alert('Settings saved locally, but failed to sync to n8n: ' + response.data.error);
+      }
+
       setShowSettingsModal(false);
       setSettingsWorkflow(null);
       setWorkflowConfig({});
+
+      // Refresh workflows to get updated data
+      fetchWorkflows();
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings: ' + error.message);
+      if (error.response) {
+        console.error('Backend error response:', error.response.data);
+        alert('Failed to save settings: ' + (error.response.data.error || error.message));
+      } else {
+        alert('Failed to save settings: ' + error.message);
+      }
     } finally {
       setSavingSettings(false);
     }
@@ -562,9 +793,31 @@ function AutomationsLibrary() {
     console.log('Opening settings for workflow:', workflow);
     console.log('Workflow n8n_data:', workflow.n8n_data);
     setSettingsWorkflow(workflow);
+
+    // Load saved config from localStorage
     const savedConfig = loadWorkflowConfig(workflow.id);
     console.log('Loaded config:', savedConfig);
-    setWorkflowConfig(savedConfig);
+
+    // Extract fields to get default values
+    const fields = extractRequiredFields(workflow);
+
+    // Build initial config with default values, but don't override saved values
+    const initialConfig = {};
+    fields.forEach(field => {
+      if (savedConfig[field.key] !== undefined && savedConfig[field.key] !== '') {
+        // Use saved value if it exists
+        initialConfig[field.key] = savedConfig[field.key];
+      } else if (field.defaultValue) {
+        // Use default value from workflow if no saved value exists
+        initialConfig[field.key] = field.defaultValue;
+      } else {
+        // Empty string as fallback
+        initialConfig[field.key] = '';
+      }
+    });
+
+    console.log('Initial config with defaults:', initialConfig);
+    setWorkflowConfig(initialConfig);
     setShowSettingsModal(true);
   };
 
@@ -1500,7 +1753,7 @@ function AutomationsLibrary() {
                               })}
                               placeholder={field.placeholder}
                               required={field.required}
-                              rows={4}
+                              rows={field.rows || 4}
                               className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono text-xs"
                             />
                           ) : (

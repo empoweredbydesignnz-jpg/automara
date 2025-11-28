@@ -1,0 +1,155 @@
+================================================================================
+TICKET REFERENCE NUMBERS - SETUP SUMMARY
+================================================================================
+
+ISSUE:
+Tickets need reference numbers (like TKT-000001) to identify and track them.
+
+CURRENT STATUS:
+- Database schema HAS ticket_number field
+- Trigger EXISTS but doesn't work properly (AFTER INSERT)
+- Frontend DISPLAYS ticket_number (already coded)
+- Backend RETURNS ticket_number (already coded)
+
+PROBLEM:
+The current trigger is AFTER INSERT, which means:
+- ticket_number is NOT populated in RETURNING clause
+- New tickets don't get numbers immediately
+- API responses show ticket_number: null
+
+================================================================================
+SOLUTION: RUN THE MIGRATION
+================================================================================
+
+EASIEST WAY - Double-click this file:
+    y:\FIX_TICKET_NUMBERS.bat
+
+OR run manually:
+    docker exec -i automara-postgres psql -U automara -d automara < y:\migrations\fix-ticket-number-trigger.sql
+
+================================================================================
+WHAT THE MIGRATION DOES
+================================================================================
+
+1. Creates sequence: ticket_number_seq
+2. Changes trigger: AFTER INSERT → BEFORE INSERT
+3. Updates existing tickets with numbers
+4. Ensures future tickets get numbers immediately
+
+RESULT:
+✅ New tickets instantly get: TKT-000001, TKT-000002, etc.
+✅ Ticket numbers appear in API responses
+✅ Frontend displays ticket numbers
+✅ Users can search by ticket number
+
+================================================================================
+AFTER RUNNING MIGRATION
+================================================================================
+
+1. Refresh your browser (Ctrl + Shift + R)
+2. Create a new ticket
+3. You'll see: TKT-000001 (or next number)
+
+THAT'S IT! No code changes needed - just run the migration!
+
+================================================================================
+WHERE TICKET NUMBERS APPEAR
+================================================================================
+
+Dashboard:
+- Tickets card (coming soon - shows count)
+
+Tickets Page:
+  Ticket          Subject                Status
+  TKT-000001     Cannot login           Open
+  TKT-000002     Feature request        In Progress
+  TKT-000003     Bug report            Resolved
+
+Ticket Details:
+  TKT-000001
+  Cannot login to account
+
+  Status: Open | Priority: High
+  Created: 2024-01-15 10:30 AM
+
+Search:
+  Search for: "TKT-000001" - finds the ticket!
+
+================================================================================
+VERIFICATION
+================================================================================
+
+Check database:
+    docker exec -it automara-postgres psql -U automara -d automara -c "SELECT id, ticket_number, subject FROM tickets;"
+
+Expected:
+     id | ticket_number |        subject
+    ----+---------------+------------------------
+      1 | TKT-000001    | Test Ticket
+      2 | TKT-000002    | Another Ticket
+
+================================================================================
+FILES INVOLVED
+================================================================================
+
+Migration:
+    y:\migrations\fix-ticket-number-trigger.sql    (NEW - fixes trigger)
+    y:\migrations\create-tickets-schema.sql        (original schema)
+
+Helper Scripts:
+    y:\FIX_TICKET_NUMBERS.bat                      (run migration easily)
+    y:\FIX_TICKET_NUMBERS.md                       (detailed documentation)
+
+Frontend:
+    y:\frontend\src\pages\TicketsPage.jsx          (displays ticket_number)
+
+Backend:
+    y:\backend\routes\tickets.js                   (returns ticket_number)
+
+================================================================================
+TICKET NUMBER FORMAT
+================================================================================
+
+Current: TKT-000001
+         ^^^-^^^^^^
+         |   |
+         |   +-- 6-digit number with leading zeros
+         +------ Prefix "TKT"
+
+Can be customized to:
+- TKT-2024-000001 (with year)
+- TKT-5-000001 (with tenant ID)
+- T0001 (shorter)
+- SUP-000001 (different prefix)
+
+See FIX_TICKET_NUMBERS.md for customization examples.
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: Migration fails
+Solution: Check Docker is running
+    docker ps | grep postgres
+
+Problem: Still no ticket numbers
+Solution: Check trigger exists
+    docker exec -it automara-postgres psql -U automara -d automara -c "SELECT tgname FROM pg_trigger WHERE tgname LIKE '%ticket%';"
+
+Problem: Existing tickets don't have numbers
+Solution: Update them manually
+    docker exec -it automara-postgres psql -U automara -d automara -c "UPDATE tickets SET ticket_number = 'TKT-' || LPAD(id::TEXT, 6, '0') WHERE ticket_number IS NULL;"
+
+================================================================================
+QUICK START
+================================================================================
+
+1. Double-click: y:\FIX_TICKET_NUMBERS.bat
+2. Wait for "SUCCESS!"
+3. Refresh browser (Ctrl + Shift + R)
+4. Create a ticket
+5. See ticket number: TKT-000001
+
+Done! 🎫
+
+================================================================================
